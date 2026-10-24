@@ -3,6 +3,7 @@ name: Simple Deck-Builder
 description: Everyone starts with the same weak deck. Play action cards, spend coins to buy better cards, and finish with the most victory points.
 players: { min: 2, max: 4 }
 scoreLabel: Victory points
+scoreOrder: higher
 timing:
   setup: 180
   default: 4
@@ -164,3 +165,5 @@ actions:
 endWhen: "provincesLeft == 0 or emptyPiles >= 3 or turn > 30 * numPlayers"
 winners: "highest(players, p => vp(p))"
 score: "vp(p)"
+# Who is ahead mid-game (higher is better); used for lead changes and comebacks.
+progress: "vp(p)"

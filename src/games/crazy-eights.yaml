@@ -3,6 +3,7 @@ name: Crazy Eights
 description: Match the suit or rank of the top card; eights are wild. First to empty their hand wins.
 players: { min: 2, max: 7 }
 scoreLabel: Penalty points left in hand (lower is better)
+scoreOrder: lower
 timing:
   setup: 90
   actions: { play: 6, draw: 4, pass: 2 }
@@ -83,3 +84,5 @@ actions:
 endWhen: "any(players, p => len(p.hand) == 0) or passes >= numPlayers"
 winners: "lowest(players, p => sum(p.hand, c => penalty(c)))"
 score: "sum(p.hand, c => penalty(c))"
+# Who is ahead mid-game (higher is better); used for lead changes and comebacks.
+progress: "-len(p.hand)"

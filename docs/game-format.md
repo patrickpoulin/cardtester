@@ -34,6 +34,7 @@ When the game ends, `winners` decides who won and `score` gives each player's fi
 | `description` | | One or two sentences shown in the app |
 | `players` | yes | `{ min: 2, max: 4 }` |
 | `scoreLabel` | | What `score` means, e.g. `Victory points` or `Penalty points (lower is better)` |
+| `scoreOrder` | | `higher` (default) or `lower`: whether a high or a low final score is good; used for winning margins |
 | `timing` | | Real-world seconds for the playtime estimate: `{ setup: 90, default: 4, actions: { play: 6 } }` |
 | `cards` | yes | The cards in the game (see below) |
 | `zones` | yes | Where cards can be (see below) |
@@ -46,6 +47,7 @@ When the game ends, `winners` decides who won and `score` gives each player's fi
 | `endWhen` | yes | Expression; the game ends when it is true |
 | `winners` | yes | Expression giving the winning player(s) |
 | `score` | | Expression giving each player's final score; `p` is the player |
+| `progress` | | Expression saying how far ahead player `p` is mid-game (higher is better); enables comeback and lead-change statistics |
 
 ## Cards
 
@@ -202,3 +204,20 @@ score: "p.score"                            # evaluated for each player as p
 ```
 
 Several winners means a shared win; each gets an equal share in the win-rate statistics.
+
+## Progress (who's ahead mid-game)
+
+```yaml
+progress: "-len(p.hand)"                                   # Crazy Eights: fewer cards is better
+progress: "-(p.score + sum(p.taken, c => points(c)))"      # Hearts: fewer points is better
+progress: "vp(p)"                                           # deck-builder: more victory points
+```
+
+`progress` is checked at the start of every turn. Higher always means further ahead, so negate
+values where less is better. From it the report measures:
+
+- **Comeback wins:** games won by a player who wasn't alone in the lead halfway through.
+- **Lead changes:** how many times the sole leader changed during a game (ties don't count).
+
+The **winning margin** (gap between the winner's final score and the best other score) uses
+`score` and `scoreOrder` and doesn't need `progress`.

@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { BUILTIN_GAMES, type GameEntry } from '../games';
+import { ComparePanel } from './ComparePanel';
+import { SavedRunsPanel } from './SavedRunsPanel';
 import { SimulatePanel } from './SimulatePanel';
 import { SettingsPanel } from './SettingsPanel';
 import { UploadPanel } from './UploadPanel';
 
 const TABS = [
   { id: 'simulate', label: 'Simulate' },
+  { id: 'compare', label: 'Compare' },
+  { id: 'saved', label: 'Saved runs' },
   { id: 'upload', label: 'Upload a game' },
   { id: 'settings', label: 'Settings' },
 ] as const;
@@ -16,6 +20,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>('simulate');
   const [games, setGames] = useState<GameEntry[]>(BUILTIN_GAMES);
   const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
+  const [savedVersion, setSavedVersion] = useState(0);
+  const onSaved = () => setSavedVersion((v) => v + 1);
 
   function addGame(entry: GameEntry) {
     setGames((prev) => [...prev.filter((g) => g.game.id !== entry.game.id), entry]);
@@ -23,6 +29,7 @@ export function App() {
     setTab('simulate');
   }
 
+  // Panels stay mounted while hidden so results survive switching tabs.
   return (
     <div className="app">
       <header className="header">
@@ -37,9 +44,21 @@ export function App() {
         </nav>
       </header>
       <main>
-        {tab === 'simulate' && <SimulatePanel games={games} selectedId={selectedId} onSelect={setSelectedId} />}
-        {tab === 'upload' && <UploadPanel games={games} onAdd={addGame} />}
-        {tab === 'settings' && <SettingsPanel />}
+        <div hidden={tab !== 'simulate'}>
+          <SimulatePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+        </div>
+        <div hidden={tab !== 'compare'}>
+          <ComparePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+        </div>
+        <div hidden={tab !== 'saved'}>
+          <SavedRunsPanel version={savedVersion} />
+        </div>
+        <div hidden={tab !== 'upload'}>
+          <UploadPanel games={games} onAdd={addGame} />
+        </div>
+        <div hidden={tab !== 'settings'}>
+          <SettingsPanel />
+        </div>
       </main>
     </div>
   );

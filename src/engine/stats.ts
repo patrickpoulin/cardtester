@@ -1,9 +1,12 @@
 import { getAgent } from './agents';
-import type { GameRecord, SimConfig } from './simulate';
+import { isComeback, type GameRecord, type SimConfig } from './simulate';
 import type { AnyGame } from './types';
 
 export interface Distribution {
+  /** Number of values; with `sd` this lets two runs be compared for significance. */
+  n: number;
   mean: number;
+  sd: number;
   median: number;
   p10: number;
   p90: number;
@@ -29,13 +32,33 @@ export interface CardStats {
   playedByWinner: number;
 }
 
+/** A share of games, with its 95% confidence range; `n` is how many games it was measured on. */
+export interface Rate {
+  count: number;
+  n: number;
+  rate: number;
+  ci95: [number, number];
+}
+
 export interface Summary {
   gameId: string;
   gameName: string;
   numPlayers: number;
   games: number;
+  /** Bot label per seat, e.g. ['Casual', 'Beginner']. */
+  agents: string[];
+  seed: number;
   scoreLabel: string;
+  scoreOrder: 'higher' | 'lower';
   seats: SeatStats[];
+  /** Player 1's win rate minus an even share; positive means going first helps. */
+  firstPlayerAdvantage: number;
+  /** Games won by someone who wasn't alone in the lead halfway through (needs the game's `progress`). */
+  comebacks?: Rate;
+  /** How often the sole leader changed during a game (needs the game's `progress`). */
+  leadChanges?: Distribution;
+  /** Gap between the winner's score and the next best score. */
+  margin?: Distribution;
   /** Games that ended with no winner (hit the action cap). */
   noWinnerRate: number;
   turns: Distribution;
@@ -65,6 +88,9 @@ export function computeStats(game: AnyGame, records: GameRecord[], config: SimCo
   });
 
   const turns = records.map((r) => r.turns);
+  const comebackFlags = records.map(isComeback).filter((c) => c !== undefined);
+  const leadChanges = records.flatMap((r) => (r.leadChanges === undefined ? [] : [r.leadChanges]));
+  const margins = records.flatMap((r) => (r.margin === undefined ? [] : [r.margin]));
   const cardTotals = new Map<string, { plays: number; byWinner: number }>();
   for (const r of records) {
     for (const [card, perSeat] of Object.entries(r.cardPlays)) {
@@ -90,8 +116,15 @@ export function computeStats(game: AnyGame, records: GameRecord[], config: SimCo
     gameName: game.name,
     numPlayers: config.numPlayers,
     games: n,
+    agents: config.agents.map((a) => getAgent(a).label),
+    seed: config.seed,
     scoreLabel: game.scoreLabel,
+    scoreOrder: game.scoreOrder ?? 'higher',
     seats,
+    firstPlayerAdvantage: seats[0].winRate - 1 / config.numPlayers,
+    comebacks: comebackFlags.length ? rate(comebackFlags.filter(Boolean).length, comebackFlags.length) : undefined,
+    leadChanges: leadChanges.length ? distribution(leadChanges) : undefined,
+    margin: margins.length ? distribution(margins) : undefined,
     noWinnerRate: n ? records.filter((r) => r.winners.length === 0).length / n : 0,
     turns: distribution(turns),
     turnHistogram: histogram(turns),
@@ -105,12 +138,20 @@ function mean(values: number[]): number {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
 }
 
+function rate(count: number, n: number): Rate {
+  return { count, n, rate: n ? count / n : 0, ci95: wilson(count, n) };
+}
+
 function distribution(values: number[]): Distribution {
-  if (!values.length) return { mean: 0, median: 0, p10: 0, p90: 0, min: 0, max: 0 };
+  if (!values.length) return { n: 0, mean: 0, sd: 0, median: 0, p10: 0, p90: 0, min: 0, max: 0 };
   const sorted = [...values].sort((a, b) => a - b);
   const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+  const m = mean(values);
+  const variance = values.length > 1 ? values.reduce((s, v) => s + (v - m) ** 2, 0) / (values.length - 1) : 0;
   return {
-    mean: mean(values),
+    n: values.length,
+    mean: m,
+    sd: Math.sqrt(variance),
     median: q(0.5),
     p10: q(0.1),
     p90: q(0.9),

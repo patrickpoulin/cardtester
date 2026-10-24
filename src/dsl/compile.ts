@@ -126,6 +126,15 @@ class GameCompiler {
     const endWhen = this.expr(spec.endWhen, 'endWhen');
     const winners = this.expr(spec.winners, 'winners');
     const score = spec.score === undefined ? undefined : this.expr(spec.score, 'score');
+    const progress = spec.progress === undefined ? undefined : this.expr(spec.progress, 'progress');
+    const perPlayer = (fn: Compiled, path: string, state: DslState) => {
+      const env = root(state);
+      return state.players.map((p) => {
+        const v = fn(env.child({ p }));
+        if (typeof v !== 'number') throw new RuleError(`${path}: expected a number, got ${JSON.stringify(v)}`);
+        return v;
+      });
+    };
 
     for (const id of Object.keys(spec.timing.actions ?? {})) {
       if (!byId.has(id)) this.issues.push(`timing.actions.${id}: there is no action with id "${id}"`);
@@ -152,6 +161,7 @@ class GameCompiler {
       minPlayers: spec.players.min,
       maxPlayers: spec.players.max,
       scoreLabel: spec.scoreLabel,
+      scoreOrder: spec.scoreOrder,
       timing: {
         setupSeconds: timing.setup ?? 60,
         actionSeconds: (action) => timing.actions?.[action.type] ?? timing.default ?? 4,
@@ -256,14 +266,11 @@ class GameCompiler {
         const won = winners(env);
         const list = Array.isArray(won) ? won : [won];
         const indices = [...new Set(list.map((w) => playerIndex(w, state, 'winners')))].sort((x, y) => x - y);
-        const scores = state.players.map((p) => {
-          if (!score) return 0;
-          const s = score(env.child({ p }));
-          if (typeof s !== 'number') throw new RuleError(`score: expected a number, got ${JSON.stringify(s)}`);
-          return s;
-        });
+        const scores = score ? perPlayer(score, 'score', state) : state.players.map(() => 0);
         return { winners: indices, scores };
       },
+
+      progress: progress && ((state) => perPlayer(progress, 'progress', state)),
 
       describeAction: (_state, action) => {
         const a = byId.get(action.type);
