@@ -112,8 +112,8 @@ export function RulesUpload({ onAdd, onOpenSettings, onEdit }: Props) {
             <input type="file" multiple accept=".pdf,.docx,.txt,.md" disabled={running} onChange={(e) => setRulesFiles([...(e.target.files ?? [])])} />
           </label>
           <label>
-            Card list (optional, CSV or text)
-            <input type="file" accept=".csv,.tsv,.txt,.md" disabled={running} onChange={(e) => setCardFile(e.target.files?.[0] ?? null)} />
+            Card list (optional: Excel, CSV or text)
+            <input type="file" accept=".xlsx,.csv,.tsv,.txt,.md" disabled={running} onChange={(e) => setCardFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
         <details className="source">

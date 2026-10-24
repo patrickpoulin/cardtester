@@ -18,7 +18,7 @@ versions are played with the same shuffles. The report says which differences ar
 could just be luck. Every run is kept under **Saved runs**, where any two can be compared.
 
 **Upload a game** turns your own game into something the simulator can play. Add the rulebook (PDF,
-Word or text) and optionally a card list (CSV). Claude writes a `game.yaml`
+Word or text) and optionally a card list (Excel `.xlsx` or CSV). Claude writes a `game.yaml`
 ([format reference](docs/game-format.md)); the app validates it and plays test games, sending any
 problems back to Claude to fix. Claude also asks about anything the rules leave unclear, and you can
 rebuild the file with your answers, watch a sample game, then add it to your games. You can also
@@ -51,7 +51,7 @@ npm run sim -- --file my-game.yaml --players 3
 | `src/games/` | Built-in games as `game.yaml` files |
 | `docs/game-format.md` | Reference for writing game files |
 | `src/worker/`, `src/runner.ts` | Splits a run across one Web Worker per CPU core |
-| `src/compiler/` | The rules compiler: `rulesCompiler.ts` (conversation with Claude, fix loop), `prompt.ts` (instructions and reply schema), `files.ts` (reading PDF, Word and text uploads), `claude.ts` (API client) |
+| `src/compiler/` | The rules compiler: `rulesCompiler.ts` (conversation with Claude, fix loop), `prompt.ts` (instructions and reply schema), `files.ts` (reading PDF, Word, Excel and text uploads), `claude.ts` (API client) |
 | `src/ui/` | React interface |
 | `cli/` | Command-line runner using the same engine |
 | `tests/` | Vitest tests; `tests/reference/crazyEights.ts` is a hand-written Crazy Eights used to check the interpreter |
