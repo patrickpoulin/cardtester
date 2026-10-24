@@ -26,6 +26,8 @@ export interface GameDefinition<S = unknown, A extends Action = Action> {
   minPlayers: number;
   maxPlayers: number;
   scoreLabel: string;
+  /** Whether a high or a low final score is good (penalty points are 'lower'). Defaults to 'higher'. */
+  scoreOrder?: 'higher' | 'lower';
   /** Rough real-world seconds, used to turn simulated actions into an estimated playtime. */
   timing: {
     setupSeconds: number;
@@ -38,6 +40,8 @@ export interface GameDefinition<S = unknown, A extends Action = Action> {
   isTerminal(state: S): boolean;
   result(state: S): GameResult;
   describeAction(state: S, action: A): string;
+  /** How far ahead each player is right now, higher is better. Enables lead-change and comeback statistics. */
+  progress?(state: S): number[];
   /** Optional move rating (higher is better) used by the greedy agent. */
   heuristic?(state: S, action: A): number;
 }

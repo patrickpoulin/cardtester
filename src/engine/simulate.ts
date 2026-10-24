@@ -25,6 +25,17 @@ export interface GameRecord {
   hitActionLimit: boolean;
   /** Card name -> how many times each seat played it. */
   cardPlays: Record<string, number[]>;
+  /** Times the sole leader changed to a different player (needs `progress`). */
+  leadChanges?: number;
+  /** Seat that was alone in the lead halfway through the game, or -1 if the lead was shared (needs `progress`). */
+  halfwayLeader?: number;
+  /** Gap between the winner's final score and the best other score. */
+  margin?: number;
+}
+
+export function isComeback(r: GameRecord): boolean | undefined {
+  if (r.halfwayLeader === undefined || r.halfwayLeader < 0 || r.winners.length === 0) return undefined;
+  return !r.winners.includes(r.halfwayLeader);
 }
 
 const DEFAULT_MAX_ACTIONS = 10_000;
@@ -52,12 +63,18 @@ export function playGame(game: AnyGame, config: SimConfig, index: number, trace 
   let turns = 0;
   let lastPlayer = -1;
   let seconds = game.timing.setupSeconds;
+  // The sole leader at the start of each turn (-1 when tied), sampled when the game has `progress`.
+  const leaders: number[] = [];
+  const sampleLeader = () => {
+    if (game.progress) leaders.push(soleLeader(game.progress(state)));
+  };
 
   while (!game.isTerminal(state) && actions < maxActions) {
     const player = game.currentPlayer(state);
     if (player !== lastPlayer) {
       turns++;
       lastPlayer = player;
+      sampleLeader();
     }
     const legal = game.legalActions(state);
     if (legal.length === 0) throw new Error(`${game.name}: player ${player + 1} has no legal moves (game ${index})`);
@@ -76,6 +93,7 @@ export function playGame(game: AnyGame, config: SimConfig, index: number, trace 
   const result = hitActionLimit
     ? { winners: [], scores: new Array(config.numPlayers).fill(0) }
     : game.result(state);
+  sampleLeader();
 
   if (trace) {
     log.push(
@@ -96,9 +114,36 @@ export function playGame(game: AnyGame, config: SimConfig, index: number, trace 
       estimatedSeconds: seconds,
       hitActionLimit,
       cardPlays,
+      ...(game.progress && { leadChanges: countLeadChanges(leaders), halfwayLeader: leaders[Math.floor(leaders.length / 2)] ?? -1 }),
+      margin: winningMargin(result.winners, result.scores, game.scoreOrder ?? 'higher'),
     },
     log,
   };
+}
+
+function soleLeader(progress: number[]): number {
+  const best = Math.max(...progress);
+  const leaders = progress.flatMap((p, i) => (p === best ? [i] : []));
+  return leaders.length === 1 ? leaders[0] : -1;
+}
+
+/** Counts changes of sole leader; a tie doesn't count as a change by itself. */
+function countLeadChanges(leaders: number[]): number {
+  let changes = 0;
+  let last = -1;
+  for (const l of leaders) {
+    if (l < 0) continue;
+    if (last >= 0 && l !== last) changes++;
+    last = l;
+  }
+  return changes;
+}
+
+function winningMargin(winners: number[], scores: number[], order: 'higher' | 'lower'): number | undefined {
+  const others = scores.filter((_, i) => !winners.includes(i));
+  if (winners.length === 0 || others.length === 0) return undefined;
+  const pick = order === 'higher' ? Math.max : Math.min;
+  return Math.abs(pick(...winners.map((w) => scores[w])) - pick(...others));
 }
 
 /** Plays games start..start+count-1. Used by both the browser workers and the CLI. */

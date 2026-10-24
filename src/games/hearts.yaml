@@ -3,6 +3,7 @@ name: Hearts
 description: A trick-taking game. Avoid hearts (1 point each) and the queen of spades (13 points). When someone reaches 100, the lowest score wins.
 players: { min: 4, max: 4 }
 scoreLabel: Points (lower is better)
+scoreOrder: lower
 timing:
   setup: 60
   default: 5
@@ -108,3 +109,5 @@ actions:
 endWhen: "any(players, p => p.score >= 100)"
 winners: "lowest(players, p => p.score)"
 score: "p.score"
+# Who is ahead mid-game (higher is better); used for lead changes and comebacks.
+progress: "-(p.score + sum(p.taken, c => points(c)))"

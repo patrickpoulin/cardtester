@@ -8,8 +8,14 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 1. Open the site, choose a game (Crazy Eights, Hearts or a simple deck-builder), the number of
    players and how well each one plays.
 2. Click **Run**. Your computer plays all the games, spread across its CPU cores.
-3. Read the report: win rate per seat with 95% confidence ranges, game length, estimated playtime
-   and which cards the winners played. **Watch one game** steps through a single game move by move.
+3. Read the report: win rate per seat with 95% confidence ranges, first-player advantage, comeback
+   wins, lead changes, winning margins, game length, estimated playtime and which cards the winners
+   played. **Watch one game** steps through a single game move by move. Download it as a spreadsheet
+   (summary or one row per game).
+
+**Compare** tests a change: edit a copy of the game's rules (a card's cost, the hand size) and both
+versions are played with the same shuffles. The report says which differences are real and which
+could just be luck. Every run is kept under **Saved runs**, where any two can be compared.
 
 Games are described in `game.yaml` files ([format reference](docs/game-format.md)). You can paste
 your own on the **Upload a game** tab; it is checked, test-played, and added to the game list.
@@ -35,6 +41,7 @@ npm run sim -- --file my-game.yaml --players 3
 | Path | What it is |
 |---|---|
 | `src/engine/` | Game-agnostic simulator: `types.ts` (the `GameDefinition` interface), seeded `rng.ts`, `agents.ts` (bots), `simulate.ts`, `stats.ts` |
+| `src/report/` | Comparing runs with significance tests (`compare.ts`), CSV export, rules-file diff, saved runs in IndexedDB |
 | `src/dsl/` | The `game.yaml` format: `schema.ts` (structure), `expr.ts` (rule expressions), `compile.ts` (turns a file into a `GameDefinition`), `smoke.ts` (test-plays a new game) |
 | `src/games/` | Built-in games as `game.yaml` files |
 | `docs/game-format.md` | Reference for writing game files |

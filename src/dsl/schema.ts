@@ -97,6 +97,7 @@ const ActionSchema = z.strictObject({
   effects: Effects.default([]),
   endsTurn: z.boolean().optional(),
   score: Expr.optional(),
+  progress: Expr.optional(),
 });
 
 export const GameSchema = z.strictObject({
@@ -105,6 +106,7 @@ export const GameSchema = z.strictObject({
   description: z.string().default(''),
   players: z.strictObject({ min: z.number().int().min(1), max: z.number().int().min(1) }),
   scoreLabel: z.string().default('Score'),
+  scoreOrder: z.enum(['higher', 'lower']).default('higher'),
   timing: z
     .strictObject({
       setup: z.number().min(0).optional(),
@@ -131,6 +133,7 @@ export const GameSchema = z.strictObject({
   endWhen: Expr,
   winners: Expr,
   score: Expr.optional(),
+  progress: Expr.optional(),
 });
 
 export type GameSpec = z.infer<typeof GameSchema>;

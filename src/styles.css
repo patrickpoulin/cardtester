@@ -413,3 +413,66 @@ code {
 a {
   color: var(--accent);
 }
+
+.actions.tight {
+  margin-top: 0;
+}
+
+.table-wrap.tall {
+  max-height: 520px;
+}
+
+.group-row td {
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+td.strong {
+  font-weight: 600;
+}
+
+td.nowrap,
+.nowrap {
+  white-space: nowrap;
+}
+
+tr.selected td {
+  background: var(--accent-soft);
+}
+
+button.link {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  color: var(--accent);
+}
+
+button.link.danger {
+  color: var(--error);
+}
+
+.changes {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.change {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.table-wrap.full {
+  max-height: none;
+}
