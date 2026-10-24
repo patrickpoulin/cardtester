@@ -16,8 +16,8 @@ the rulebook into a playable definition, never per move.
 | 0. Engine MVP | `GameDefinition` interface, seeded simulator, Beginner/Casual bots, stats, one hand-written game (Crazy Eights), Web Worker runner, CLI, Pages deploy | ✅ Done |
 | 1. Game definition language | `game.yaml` format validated with zod: cards with attributes and on-play effects, shared and per-player zones and variables, setup, rounds, turn hooks, actions with conditions, card picks and choices, effects, end conditions. A sandboxed expression language (no `eval`) for rules. Interpreter producing a `GameDefinition`. Crazy Eights, Hearts and a simple deck-builder ported; the YAML Crazy Eights matches the hand-written one statistically. Paste-a-game in the UI with validation and test play. Reference: [docs/game-format.md](docs/game-format.md) | ✅ Done |
 | 2. Richer reports | First-player advantage, comeback wins, lead changes and winning margins (from a new `progress` rule). Compare page: edit a copy of a game and play both versions with the same shuffles; each difference is tested for significance (card rows corrected for picking the biggest movers). Saved runs in IndexedDB with view, delete and compare-any-two. CSV downloads of the summary, every game and comparisons | ✅ Done |
-| 3. Rules compiler | Upload rules (PDF/Word/text) and a card spreadsheet (mapped to `cards` entries). Claude produces `game.yaml`, using docs/game-format.md as its reference, plus a list of ambiguities for the user to answer. Validation and test-play errors go back to Claude to fix. Sample-game viewer for checking | Next |
-| 4. Expert bot | Information-set Monte Carlo tree search (ISMCTS) so results reflect skilled play; mixed-skill tables | |
+| 3. Rules compiler | Upload rules (PDF/Word/text) and a card spreadsheet (mapped to `cards` entries). Claude produces `game.yaml`, using docs/game-format.md as its reference, plus a list of ambiguities for the user to answer. Validation and test-play errors go back to Claude to fix (up to 3 times). Questions shown with the assumed answer selected; rebuild with answers. Sample-game viewer, hand editing, and games saved in the browser | ✅ Done |
+| 4. Expert bot | Information-set Monte Carlo tree search (ISMCTS) so results reflect skilled play; mixed-skill tables | Next |
 | 5. Polish | Import/export game files, shareable result links, playtime calibration from real playtests | |
 
 ## Key decisions
@@ -31,6 +31,18 @@ the rulebook into a playable definition, never per move.
   each game, which should be calibrated against real playtests.
 - **Bot quality affects the results.** Random players make most games look balanced; draw balance
   conclusions from the Casual and (later) Expert bots, and always report which bots were used.
+
+## Rules compiler
+
+- One conversation per upload, only ever appended to, so the rulebook and earlier turns are served from
+  the prompt cache on follow-up turns (answers and fixes).
+- The system prompt holds the format reference and the three built-in games as examples, and never
+  changes between requests, so it is cached too.
+- Replies use structured outputs (summary, complete file, questions with the assumed option) and
+  stream, so long files don't hit request timeouts.
+- Server-side fallback (`fallbacks: "default"`) retries a safety-classifier decline on Anthropic's
+  recommended fallback model; a final refusal is reported to the user.
+- Usage (input, cached input, output tokens) is shown after each step, since it's the user's key.
 
 ## Performance
 
