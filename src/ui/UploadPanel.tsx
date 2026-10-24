@@ -2,24 +2,38 @@ import { useRef, useState } from 'react';
 import { GameDefinitionError, loadGame } from '../dsl/compile';
 import { smokeTest } from '../dsl/smoke';
 import type { GameEntry } from '../games';
-import { RulesUpload } from './RulesUpload';
+import { PROMPTS, TEMPLATE, TEMPLATE_FILE_NAME } from '../template';
+import { downloadFile } from './download';
 
 interface Props {
   games: GameEntry[];
   onAdd(entry: GameEntry): void;
   onRemove(id: string): void;
-  onOpenSettings(): void;
 }
 
-export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
+function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {},
+    );
+  }
+  return <button onClick={copy}>{copied ? 'Copied' : label}</button>;
+}
+
+export function UploadPanel({ games, onAdd, onRemove }: Props) {
   const [source, setSource] = useState('');
   const [issues, setIssues] = useState<string[]>([]);
   const editor = useRef<HTMLElement>(null);
   const yours = games.filter((g) => !g.builtin);
 
-  function check() {
+  function check(text = source) {
     try {
-      const game = loadGame(source);
+      const game = loadGame(text);
       if (games.some((g) => g.builtin && g.game.id === game.id)) {
         setIssues([`id: "${game.id}" is a built-in game; give your game a different id`]);
         return;
@@ -30,7 +44,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
         return;
       }
       setIssues([]);
-      onAdd({ game, source, builtin: false });
+      onAdd({ game, source: text, builtin: false });
     } catch (err) {
       setIssues(err instanceof GameDefinitionError ? err.issues : [err instanceof Error ? err.message : String(err)]);
     }
@@ -42,20 +56,73 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
     editor.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
+  async function openFile(file: File | undefined) {
+    if (!file) return;
+    const text = await file.text();
+    setSource(text);
+    check(text);
+  }
+
+  const fixPrompt = `${PROMPTS.find((p) => p.title === 'Fix problems')!.text}\n${issues.map((i) => `- ${i}`).join('\n')}`;
+
   return (
     <>
-      <RulesUpload onAdd={onAdd} onOpenSettings={onOpenSettings} onEdit={edit} />
+      <section className="card">
+        <h2>Write your game file with Claude</h2>
+        <p className="muted">
+          Card Tester plays games described in a <code>game.yaml</code> file. Claude can write one from your rulebook and card list in{' '}
+          <a href="https://claude.ai" target="_blank" rel="noreferrer">
+            claude.ai
+          </a>
+          , a step at a time.
+        </p>
+        <ol className="steps">
+          <li>
+            Download the template. It tells Claude how to model your game and includes the full file format with three example games.
+            <div className="actions tight">
+              <button className="primary" onClick={() => downloadFile(TEMPLATE_FILE_NAME, TEMPLATE, 'text/markdown')}>
+                Download the template
+              </button>
+            </div>
+          </li>
+          <li>Start a new chat in claude.ai and attach your rulebook, your card list (if you have one) and the template.</li>
+          <li>Send the prompts below in order. After each reply, upload or paste the file below to check it, and send Claude any problems.</li>
+        </ol>
+        {PROMPTS.map((p) => (
+          <div key={p.title} className="prompt">
+            <div className="prompt-head">
+              <div>
+                <strong>{p.title}</strong>
+                <p className="muted small">{p.when}</p>
+              </div>
+              <CopyButton text={p.text} />
+            </div>
+            <pre>{p.text}</pre>
+          </div>
+        ))}
+      </section>
 
       <section className="card" ref={editor}>
-        <h2>Paste or edit a game file</h2>
+        <h2>Upload your game file</h2>
         <p className="muted">
-          Already have your game written as a <code>game.yaml</code> file, or want to adjust one Claude wrote? Edit it here. The format is described
-          in{' '}
+          Upload the <code>game.yaml</code> Claude wrote, or paste it below. It's checked and played in a few test games before it's
+          added. The format is described in{' '}
           <a href="https://github.com/patrickpoulin/cardtester/blob/main/docs/game-format.md" target="_blank" rel="noreferrer">
             docs/game-format.md
           </a>
           .
         </p>
+        <label className="stack">
+          Game file
+          <input
+            type="file"
+            accept=".yaml,.yml,.txt"
+            onChange={(e) => {
+              openFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
         <label className="stack">
           Start from an example
           <select value="" onChange={(e) => edit(games.find((g) => g.game.id === e.target.value)?.source ?? '')}>
@@ -74,7 +141,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
           <textarea className="code" rows={18} spellCheck={false} value={source} onChange={(e) => setSource(e.target.value)} />
         </label>
         <div className="actions">
-          <button className="primary" onClick={check} disabled={!source.trim()}>
+          <button className="primary" onClick={() => check()} disabled={!source.trim()}>
             Check and add game
           </button>
         </div>
@@ -89,6 +156,9 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
                 <li key={i}>{issue}</li>
               ))}
             </ul>
+            <div className="actions">
+              <CopyButton text={fixPrompt} label="Copy as a prompt for Claude" />
+            </div>
           </div>
         )}
       </section>
@@ -96,7 +166,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
       {yours.length > 0 && (
         <section className="card">
           <h2>Your games</h2>
-          <p className="muted small">Kept in this browser. Use "Edit" to change a game, or copy its file somewhere safe to keep a backup.</p>
+          <p className="muted small">Kept in this browser. Download a game to keep a backup or use it in another browser.</p>
           <ul className="game-list">
             {yours.map((g) => (
               <li key={g.game.id}>
@@ -104,6 +174,9 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
                 <span className="nowrap">
                   <button className="link" onClick={() => edit(g.source)}>
                     Edit
+                  </button>
+                  <button className="link" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
+                    Download
                   </button>
                   <button className="link danger" onClick={() => onRemove(g.game.id)}>
                     Delete

@@ -17,16 +17,13 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 versions are played with the same shuffles. The report says which differences are real and which
 could just be luck. Every run is kept under **Saved runs**, where any two can be compared.
 
-**Upload a game** turns your own game into something the simulator can play. Add the rulebook (PDF,
-Word or text) and optionally a card list (Excel `.xlsx` or CSV). Claude writes a `game.yaml`
-([format reference](docs/game-format.md)); the app validates it and plays test games, sending any
-problems back to Claude to fix. Claude also asks about anything the rules leave unclear, and you can
-rebuild the file with your answers, watch a sample game, then add it to your games. You can also
-paste or hand-edit a `game.yaml` directly. Your games are kept in your browser.
-
-Uploading uses your own Claude API key, saved under **Settings**. The key stays in your browser and
-is sent only to `api.anthropic.com`, along with the files you upload. Never commit a key to this
-repository.
+**Upload a Game** is where your own games come in. Card Tester plays games written as a
+`game.yaml` file ([format reference](docs/game-format.md)). Download the template from that page
+and attach it, with your rulebook and card list, to a chat in claude.ai. The page gives the
+prompts to send: Claude writes the core rules first, then adds the cards in batches. Upload or
+paste each file Claude writes; the app validates it and plays test games, and any problems can be
+copied straight back to Claude as a prompt. Your games are kept in your browser, and each can be
+downloaded as a backup.
 
 ## Development
 
@@ -51,7 +48,7 @@ npm run sim -- --file my-game.yaml --players 3
 | `src/games/` | Built-in games as `game.yaml` files |
 | `docs/game-format.md` | Reference for writing game files |
 | `src/worker/`, `src/runner.ts` | Splits a run across one Web Worker per CPU core |
-| `src/compiler/` | The rules compiler: `rulesCompiler.ts` (conversation with Claude, fix loop), `prompt.ts` (instructions and reply schema), `files.ts` (reading PDF, Word, Excel and text uploads), `claude.ts` (API client) |
+| `src/template.ts` | The template and prompts designers give Claude to write a `game.yaml` |
 | `src/ui/` | React interface |
 | `cli/` | Command-line runner using the same engine |
 | `tests/` | Vitest tests; `tests/reference/crazyEights.ts` is a hand-written Crazy Eights used to check the interpreter |
