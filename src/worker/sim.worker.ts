@@ -1,4 +1,5 @@
 import { runBatch, type GameRecord, type SimConfig } from '../engine/simulate';
+import { resolveGame } from '../games';
 
 export interface WorkerRequest {
   config: SimConfig;
@@ -19,7 +20,7 @@ const ctx = self as unknown as {
 
 ctx.onmessage = ({ data }) => {
   try {
-    const records = runBatch(data.config, data.start, data.count, (done) => ctx.postMessage({ type: 'progress', done }));
+    const records = runBatch(resolveGame(data.config), data.config, data.start, data.count, (done) => ctx.postMessage({ type: 'progress', done }));
     ctx.postMessage({ type: 'done', records });
   } catch (err) {
     ctx.postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });

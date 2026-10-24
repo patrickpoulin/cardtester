@@ -1,0 +1,110 @@
+id: hearts
+name: Hearts
+description: A trick-taking game. Avoid hearts (1 point each) and the queen of spades (13 points). When someone reaches 100, the lowest score wins.
+players: { min: 4, max: 4 }
+scoreLabel: Points (lower is better)
+timing:
+  setup: 60
+  default: 5
+
+# Variant notes: no card passing. The 2♣ leads the first trick. Hearts can't be led until one has
+# been played, unless the leader holds only hearts. Taking all 26 points ("shooting the moon")
+# gives every other player 26 instead.
+
+cards:
+  - deck: standard52
+    zone: deck
+
+zones:
+  shared:
+    deck: { visibility: hidden }
+    trick: { visibility: public }
+  player:
+    hand: { visibility: owner }
+    taken: { visibility: hidden }
+
+vars:
+  shared:
+    ledSuit: null
+    heartsBroken: false
+    firstTrick: true
+  player:
+    score: 0
+    roundPoints: 0
+
+define:
+  points: "c => c.suit == '♥' ? 1 : (c.name == 'Q♠' ? 13 : 0)"
+  bestInTrick: "max(map(filter(trick, c => c.suit == ledSuit), c => c.rankHigh))"
+  trickWinner: "bottom(filter(trick, c => c.suit == ledSuit and c.rankHigh == bestInTrick)).by"
+  canFollow: "any(me.hand, c => c.suit == ledSuit)"
+  onlyHearts: "all(me.hand, c => c.suit == '♥')"
+
+round:
+  setup:
+    - forEach:
+        in: players
+        as: p
+        do:
+          - move: { from: p.taken, to: deck, all: true }
+    - shuffle: deck
+    - deal: { from: deck, to: hand, count: 13 }
+    - set: { var: heartsBroken, value: false }
+    - set: { var: firstTrick, value: true }
+    - set: { var: current, value: "bottom(filter(players, p => any(p.hand, c => c.name == '2♣')))" }
+  endWhen: "all(players, p => len(p.hand) == 0)"
+  onEnd:
+    - forEach:
+        in: players
+        as: p
+        do:
+          - set: { var: p.roundPoints, value: "sum(p.taken, c => points(c))" }
+    - if: "any(players, p => p.roundPoints == 26)"
+      then:
+        - forEach:
+            in: players
+            as: p
+            do:
+              - add: { var: p.score, value: "p.roundPoints == 26 ? 0 : 26" }
+      else:
+        - forEach:
+            in: players
+            as: p
+            do:
+              - add: { var: p.score, value: p.roundPoints }
+
+actions:
+  - id: play
+    label: plays
+    card:
+      from: me.hand
+      where: >-
+        len(trick) == 0
+          ? (not firstTrick or card.name == '2♣')
+            and (card.suit != '♥' or heartsBroken or onlyHearts)
+          : card.suit == ledSuit or not canFollow
+    effects:
+      - if: "len(trick) == 0"
+        then:
+          - set: { var: ledSuit, value: card.suit }
+      - move: { card: card, to: trick }
+      - if: "card.suit == '♥'"
+        then:
+          - set: { var: heartsBroken, value: true }
+      - if: "len(trick) == numPlayers"
+        then:
+          - nextPlayer: trickWinner
+          - move: { from: trick, to: "players[trickWinner].taken", all: true }
+          - set: { var: firstTrick, value: false }
+          - set: { var: ledSuit, value: null }
+    # Lead low non-hearts; when following, play the highest card that won't win the trick;
+    # when you can't follow, dump the queen of spades and high hearts.
+    score: >-
+      len(trick) == 0
+        ? -card.rankHigh - 3 * points(card)
+        : (card.suit == ledSuit
+            ? (card.rankHigh > bestInTrick ? -card.rankHigh - 20 * sum(trick, c => points(c)) : card.rankHigh)
+            : 10 * points(card) + card.rankHigh)
+
+endWhen: "any(players, p => p.score >= 100)"
+winners: "lowest(players, p => p.score)"
+score: "p.score"

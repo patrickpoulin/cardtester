@@ -1,6 +1,6 @@
 import { getAgent } from './agents';
 import type { GameRecord, SimConfig } from './simulate';
-import { getGame } from '../games';
+import type { AnyGame } from './types';
 
 export interface Distribution {
   mean: number;
@@ -45,8 +45,7 @@ export interface Summary {
   cards: CardStats[];
 }
 
-export function computeStats(records: GameRecord[], config: SimConfig): Summary {
-  const game = getGame(config.gameId);
+export function computeStats(game: AnyGame, records: GameRecord[], config: SimConfig): Summary {
   const n = records.length;
   const seats: SeatStats[] = config.agents.map((agentId, seat) => {
     let wins = 0;

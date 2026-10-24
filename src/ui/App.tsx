@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BUILTIN_GAMES, type GameEntry } from '../games';
 import { SimulatePanel } from './SimulatePanel';
 import { SettingsPanel } from './SettingsPanel';
 import { UploadPanel } from './UploadPanel';
@@ -13,6 +14,15 @@ type Tab = (typeof TABS)[number]['id'];
 
 export function App() {
   const [tab, setTab] = useState<Tab>('simulate');
+  const [games, setGames] = useState<GameEntry[]>(BUILTIN_GAMES);
+  const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
+
+  function addGame(entry: GameEntry) {
+    setGames((prev) => [...prev.filter((g) => g.game.id !== entry.game.id), entry]);
+    setSelectedId(entry.game.id);
+    setTab('simulate');
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -27,8 +37,8 @@ export function App() {
         </nav>
       </header>
       <main>
-        {tab === 'simulate' && <SimulatePanel />}
-        {tab === 'upload' && <UploadPanel />}
+        {tab === 'simulate' && <SimulatePanel games={games} selectedId={selectedId} onSelect={setSelectedId} />}
+        {tab === 'upload' && <UploadPanel games={games} onAdd={addGame} />}
         {tab === 'settings' && <SettingsPanel />}
       </main>
     </div>

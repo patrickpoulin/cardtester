@@ -5,13 +5,16 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 
 ## Using it
 
-1. Open the site, choose a game, the number of players and how well each one plays.
-2. Click **Run**. Your computer plays all the games (1,000 games of Crazy Eights take well under a second).
+1. Open the site, choose a game (Crazy Eights, Hearts or a simple deck-builder), the number of
+   players and how well each one plays.
+2. Click **Run**. Your computer plays all the games, spread across its CPU cores.
 3. Read the report: win rate per seat with 95% confidence ranges, game length, estimated playtime
    and which cards the winners played. **Watch one game** steps through a single game move by move.
 
-Uploading your own rules and cards is coming next (see [PLAN.md](PLAN.md)). That step uses Claude,
-with your own API key saved under **Settings**. The key stays in your browser and is sent only to
+Games are described in `game.yaml` files ([format reference](docs/game-format.md)). You can paste
+your own on the **Upload a game** tab; it is checked, test-played, and added to the game list.
+Uploading a rulebook and card list instead is coming next (see [PLAN.md](PLAN.md)). That step uses
+Claude, with your own API key saved under **Settings**. The key stays in your browser and is sent only to
 `api.anthropic.com`. Never commit a key to this repository.
 
 ## Development
@@ -22,6 +25,7 @@ npm run dev        # local site at http://localhost:5173/cardtester/
 npm test           # engine tests
 npm run build      # typecheck + production build into dist/
 npm run sim -- --game crazy-eights --players 4 --games 1000 --agents greedy,random
+npm run sim -- --file my-game.yaml --players 3
 ```
 
 `npm run sim -- --help` lists the CLI options; `--json` prints the full summary.
@@ -31,18 +35,23 @@ npm run sim -- --game crazy-eights --players 4 --games 1000 --agents greedy,rand
 | Path | What it is |
 |---|---|
 | `src/engine/` | Game-agnostic simulator: `types.ts` (the `GameDefinition` interface), seeded `rng.ts`, `agents.ts` (bots), `simulate.ts`, `stats.ts` |
-| `src/games/` | Built-in games. `crazyEights.ts` is the reference implementation |
+| `src/dsl/` | The `game.yaml` format: `schema.ts` (structure), `expr.ts` (rule expressions), `compile.ts` (turns a file into a `GameDefinition`), `smoke.ts` (test-plays a new game) |
+| `src/games/` | Built-in games as `game.yaml` files |
+| `docs/game-format.md` | Reference for writing game files |
 | `src/worker/`, `src/runner.ts` | Splits a run across one Web Worker per CPU core |
 | `src/compiler/` | Claude API client for the upcoming rules compiler |
 | `src/ui/` | React interface |
 | `cli/` | Command-line runner using the same engine |
-| `tests/` | Vitest tests |
+| `tests/` | Vitest tests; `tests/reference/crazyEights.ts` is a hand-written Crazy Eights used to check the interpreter |
 
-### Adding a game by hand
+### Adding a built-in game
 
-Implement `GameDefinition` (see `src/games/crazyEights.ts`) and add it to `GAMES` in `src/games/index.ts`.
-Give each action a `card` field when a card is played so card statistics work automatically, and add a
-`heuristic` so the Casual bot plays sensibly.
+Write a `game.yaml` (see [docs/game-format.md](docs/game-format.md)), save it in `src/games/`, and add
+it to the list in `src/games/index.ts`. The tests automatically play every built-in game at every
+player count. Give actions a `score` so the Casual bot plays sensibly.
+
+Games can also be written directly in TypeScript by implementing `GameDefinition`; see
+`tests/reference/crazyEights.ts`.
 
 ## Deploying
 

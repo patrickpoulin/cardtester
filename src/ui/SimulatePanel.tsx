@@ -2,12 +2,17 @@ import { useState } from 'react';
 import { AGENTS } from '../engine/agents';
 import { playGame, validateConfig, type SimConfig } from '../engine/simulate';
 import { computeStats, type Summary } from '../engine/stats';
-import { GAMES, getGame } from '../games';
+import type { GameEntry } from '../games';
 import { runInWorkers } from '../runner';
 import { Results } from './Results';
 
-export function SimulatePanel() {
-  const [gameId, setGameId] = useState(GAMES[0].id);
+interface Props {
+  games: GameEntry[];
+  selectedId: string;
+  onSelect(id: string): void;
+}
+
+export function SimulatePanel({ games, selectedId, onSelect }: Props) {
   const [numPlayers, setNumPlayers] = useState(4);
   const [agents, setAgents] = useState<string[]>(['greedy', 'greedy', 'greedy', 'greedy']);
   const [numGames, setNumGames] = useState(1000);
@@ -19,12 +24,23 @@ export function SimulatePanel() {
   const [trace, setTrace] = useState<string[] | null>(null);
   const [error, setError] = useState('');
 
-  const game = getGame(gameId);
-  const config: SimConfig = { gameId, numPlayers, agents, seed };
+  const entry = games.find((g) => g.game.id === selectedId) ?? games[0];
+  const game = entry.game;
+  // Built-in games are bundled with the workers; other games travel to them as game.yaml text.
+  const config: SimConfig = { gameId: game.id, source: entry.builtin ? undefined : entry.source, numPlayers, agents, seed };
 
   function changePlayers(n: number) {
     setNumPlayers(n);
     setAgents((prev) => Array.from({ length: n }, (_, i) => prev[i] ?? prev[prev.length - 1] ?? 'greedy'));
+  }
+
+  function changeGame(id: string) {
+    const next = games.find((g) => g.game.id === id)!.game;
+    onSelect(id);
+    changePlayers(Math.min(next.maxPlayers, Math.max(next.minPlayers, numPlayers)));
+    setSummary(null);
+    setTrace(null);
+    setError('');
   }
 
   async function run() {
@@ -34,9 +50,9 @@ export function SimulatePanel() {
     setRunning(true);
     const started = performance.now();
     try {
-      validateConfig(config);
+      validateConfig(game, config);
       const records = await runInWorkers(config, numGames, setProgress);
-      setSummary(computeStats(records, config));
+      setSummary(computeStats(game, records, config));
       setElapsed((performance.now() - started) / 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -48,8 +64,8 @@ export function SimulatePanel() {
   function watchOne() {
     setError('');
     try {
-      validateConfig(config);
-      setTrace(playGame(config, Math.floor(Math.random() * 1_000_000), true).log);
+      validateConfig(game, config);
+      setTrace(playGame(game, config, Math.floor(Math.random() * 1_000_000), true).log);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -62,10 +78,11 @@ export function SimulatePanel() {
         <div className="form-grid">
           <label>
             Game
-            <select value={gameId} onChange={(e) => setGameId(e.target.value)} disabled={running}>
-              {GAMES.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
+            <select value={game.id} onChange={(e) => changeGame(e.target.value)} disabled={running}>
+              {games.map((g) => (
+                <option key={g.game.id} value={g.game.id}>
+                  {g.game.name}
+                  {g.builtin ? '' : ' (yours)'}
                 </option>
               ))}
             </select>
@@ -90,7 +107,13 @@ export function SimulatePanel() {
             <input type="number" value={seed} disabled={running} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
           </label>
         </div>
-        <p className="muted small">{game.description}</p>
+        <p className="muted small">
+          {game.description} {game.minPlayers === game.maxPlayers ? `${game.minPlayers} players.` : `${game.minPlayers}-${game.maxPlayers} players.`}
+        </p>
+        <details className="source">
+          <summary>View the rules file</summary>
+          <pre>{entry.source}</pre>
+        </details>
 
         <h3>How well each player plays</h3>
         <div className="seats">

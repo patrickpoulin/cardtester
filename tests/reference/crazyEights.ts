@@ -1,8 +1,9 @@
-import type { GameDefinition } from '../engine/types';
-import type { Rng } from '../engine/rng';
+import type { GameDefinition } from '../../src/engine/types';
+import type { Rng } from '../../src/engine/rng';
 
 /*
- * Crazy Eights, standard 52-card deck.
+ * Hand-written Crazy Eights, kept as a reference to check the game.yaml interpreter against
+ * (src/games/crazy-eights.yaml implements the same rules). Standard 52-card deck.
  * - Deal 7 cards each with 2 players, otherwise 5. Flip a starter (an 8 is buried and re-flipped).
  * - On your turn play a card matching the suit or rank of the top card. Eights are wild: play one
  *   any time and name the next suit.
@@ -73,7 +74,7 @@ function handPenalty(hand: Card[]): number {
 }
 
 export const crazyEights: GameDefinition<CrazyEightsState, CrazyEightsAction> = {
-  id: 'crazy-eights',
+  id: 'crazy-eights-reference',
   name: 'Crazy Eights',
   description: 'Match the suit or rank of the top card; eights are wild. First to empty their hand wins.',
   minPlayers: 2,

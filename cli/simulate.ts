@@ -1,14 +1,22 @@
 // Command-line runner: same engine as the website, for large runs or scripting.
 // Usage: npm run sim -- --game crazy-eights --players 4 --games 1000 --agents greedy,random --seed 1 [--json]
+//        npm run sim -- --file path/to/game.yaml --players 3
+import { readFileSync, readdirSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { GameDefinitionError, loadGame } from '../src/dsl/compile';
 import { AGENTS } from '../src/engine/agents';
 import { runBatch, type SimConfig } from '../src/engine/simulate';
 import { computeStats } from '../src/engine/stats';
-import { GAMES } from '../src/games';
+
+const gamesDir = new URL('../src/games/', import.meta.url);
+const builtinIds = readdirSync(gamesDir)
+  .filter((f) => f.endsWith('.yaml'))
+  .map((f) => f.replace(/\.yaml$/, ''));
 
 const { values } = parseArgs({
   options: {
-    game: { type: 'string', default: GAMES[0].id },
+    game: { type: 'string', default: 'crazy-eights' },
+    file: { type: 'string' },
     players: { type: 'string', default: '4' },
     games: { type: 'string', default: '1000' },
     agents: { type: 'string', default: 'greedy' },
@@ -20,7 +28,8 @@ const { values } = parseArgs({
 
 if (values.help) {
   console.log(`Options:
-  --game <id>        ${GAMES.map((g) => g.id).join(' | ')}
+  --game <id>        ${builtinIds.join(' | ')}
+  --file <path>      a game.yaml file to simulate instead of a built-in game
   --players <n>      number of players
   --games <n>        number of games to simulate
   --agents <list>    comma-separated agent per seat; the last one repeats (${AGENTS.map((a) => a.id).join(' | ')})
@@ -29,19 +38,29 @@ if (values.help) {
   process.exit(0);
 }
 
+const source = values.file ? readFileSync(values.file, 'utf8') : readFileSync(new URL(`${values.game}.yaml`, gamesDir), 'utf8');
+let game;
+try {
+  game = loadGame(source);
+} catch (err) {
+  if (!(err instanceof GameDefinitionError)) throw err;
+  console.error(err.message);
+  process.exit(1);
+}
+
 const numPlayers = Number(values.players);
 const agentList = values.agents.split(',').map((s) => s.trim());
 const config: SimConfig = {
-  gameId: values.game,
+  gameId: game.id,
   numPlayers,
   agents: Array.from({ length: numPlayers }, (_, i) => agentList[Math.min(i, agentList.length - 1)]),
   seed: Number(values.seed),
 };
 
 const started = performance.now();
-const records = runBatch(config, 0, Number(values.games));
+const records = runBatch(game, config, 0, Number(values.games));
 const elapsed = (performance.now() - started) / 1000;
-const s = computeStats(records, config);
+const s = computeStats(game, records, config);
 
 if (values.json) {
   console.log(JSON.stringify(s, null, 2));

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { playGame, runBatch, type SimConfig } from '../src/engine/simulate';
 import { computeStats, wilson } from '../src/engine/stats';
 import { Rng } from '../src/engine/rng';
-import { crazyEights } from '../src/games/crazyEights';
+import { crazyEights } from './reference/crazyEights';
 
 const config = (numPlayers: number, agents = ['greedy']): SimConfig => ({
-  gameId: 'crazy-eights',
+  gameId: crazyEights.id,
   numPlayers,
   agents: Array.from({ length: numPlayers }, (_, i) => agents[i % agents.length]),
   seed: 42,
@@ -13,18 +13,18 @@ const config = (numPlayers: number, agents = ['greedy']): SimConfig => ({
 
 describe('simulator', () => {
   it('is deterministic for a given seed', () => {
-    expect(runBatch(config(4), 0, 50)).toEqual(runBatch(config(4), 0, 50));
+    expect(runBatch(crazyEights, config(4), 0, 50)).toEqual(runBatch(crazyEights, config(4), 0, 50));
   });
 
   it('gives the same games however the run is split', () => {
-    const whole = runBatch(config(4), 0, 40);
-    const split = [...runBatch(config(4), 0, 15), ...runBatch(config(4), 15, 25)];
+    const whole = runBatch(crazyEights, config(4), 0, 40);
+    const split = [...runBatch(crazyEights, config(4), 0, 15), ...runBatch(crazyEights, config(4), 15, 25)];
     expect(split).toEqual(whole);
   });
 
   it('finishes every game with a winner for 2-7 players', () => {
     for (let players = 2; players <= 7; players++) {
-      for (const r of runBatch(config(players, ['random', 'greedy']), 0, 200)) {
+      for (const r of runBatch(crazyEights, config(players, ['random', 'greedy']), 0, 200)) {
         expect(r.hitActionLimit).toBe(false);
         expect(r.winners.length).toBeGreaterThan(0);
       }
@@ -32,12 +32,12 @@ describe('simulator', () => {
   });
 
   it('rejects bad configs', () => {
-    expect(() => runBatch(config(8), 0, 1)).toThrow(/2-7 players/);
-    expect(() => runBatch({ ...config(4), agents: ['nope', 'nope', 'nope', 'nope'] }, 0, 1)).toThrow(/Unknown agent/);
+    expect(() => runBatch(crazyEights, config(8), 0, 1)).toThrow(/2-7 players/);
+    expect(() => runBatch(crazyEights, { ...config(4), agents: ['nope', 'nope', 'nope', 'nope'] }, 0, 1)).toThrow(/Unknown agent/);
   });
 
   it('produces a readable trace', () => {
-    const { log } = playGame(config(3), 0, true);
+    const { log } = playGame(crazyEights, config(3), 0, true);
     expect(log[0]).toMatch(/^Turn 1 · Player 1: /);
     expect(log[log.length - 1]).toMatch(/^Game over/);
   });
@@ -45,8 +45,8 @@ describe('simulator', () => {
 
 describe('stats', () => {
   it('win rates and no-winner rate add up to 100%', () => {
-    const records = runBatch(config(4, ['greedy', 'random']), 0, 300);
-    const s = computeStats(records, config(4, ['greedy', 'random']));
+    const records = runBatch(crazyEights, config(4, ['greedy', 'random']), 0, 300);
+    const s = computeStats(crazyEights, records, config(4, ['greedy', 'random']));
     const total = s.seats.reduce((sum, seat) => sum + seat.winRate, 0) + s.noWinnerRate;
     expect(total).toBeCloseTo(1, 6);
     expect(s.turnHistogram.reduce((sum, b) => sum + b.count, 0)).toBe(300);
@@ -54,7 +54,7 @@ describe('stats', () => {
 
   it('greedy beats random', () => {
     const cfg = config(2, ['greedy', 'random']);
-    const s = computeStats(runBatch(cfg, 0, 1000), cfg);
+    const s = computeStats(crazyEights, runBatch(crazyEights, cfg, 0, 1000), cfg);
     expect(s.seats[0].winRate).toBeGreaterThan(s.seats[1].winRate);
   });
 
