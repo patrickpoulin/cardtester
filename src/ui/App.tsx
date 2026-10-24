@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { loadGame } from '../dsl/compile';
 import { BUILTIN_GAMES, type GameEntry } from '../games';
+import { deleteGame, listGames, saveGame } from '../report/storage';
 import { ComparePanel } from './ComparePanel';
 import { SavedRunsPanel } from './SavedRunsPanel';
 import { SimulatePanel } from './SimulatePanel';
@@ -23,10 +25,33 @@ export function App() {
   const [savedVersion, setSavedVersion] = useState(0);
   const onSaved = () => setSavedVersion((v) => v + 1);
 
+  // Bring back games uploaded or pasted on earlier visits.
+  useEffect(() => {
+    listGames()
+      .then((saved) => {
+        const entries = saved.flatMap((g) => {
+          try {
+            return [{ game: loadGame(g.source), source: g.source, builtin: false }];
+          } catch {
+            return [];
+          }
+        });
+        setGames((prev) => [...prev, ...entries.filter((e) => !prev.some((p) => p.game.id === e.game.id))]);
+      })
+      .catch(() => {});
+  }, []);
+
   function addGame(entry: GameEntry) {
     setGames((prev) => [...prev.filter((g) => g.game.id !== entry.game.id), entry]);
     setSelectedId(entry.game.id);
     setTab('simulate');
+    saveGame(entry.game.id, entry.source).catch(() => {});
+  }
+
+  function removeGame(id: string) {
+    setGames((prev) => prev.filter((g) => g.builtin || g.game.id !== id));
+    if (selectedId === id) setSelectedId(BUILTIN_GAMES[0].game.id);
+    deleteGame(id).catch(() => {});
   }
 
   // Panels stay mounted while hidden so results survive switching tabs.
@@ -54,7 +79,7 @@ export function App() {
           <SavedRunsPanel version={savedVersion} />
         </div>
         <div hidden={tab !== 'upload'}>
-          <UploadPanel games={games} onAdd={addGame} />
+          <UploadPanel games={games} onAdd={addGame} onRemove={removeGame} onOpenSettings={() => setTab('settings')} />
         </div>
         <div hidden={tab !== 'settings'}>
           <SettingsPanel />

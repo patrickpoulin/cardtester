@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { GameDefinitionError, loadGame } from '../dsl/compile';
 import { smokeTest } from '../dsl/smoke';
 import type { GameEntry } from '../games';
+import { RulesUpload } from './RulesUpload';
 
 interface Props {
   games: GameEntry[];
   onAdd(entry: GameEntry): void;
+  onRemove(id: string): void;
+  onOpenSettings(): void;
 }
 
-export function UploadPanel({ games, onAdd }: Props) {
+export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
   const [source, setSource] = useState('');
   const [issues, setIssues] = useState<string[]>([]);
+  const editor = useRef<HTMLElement>(null);
+  const yours = games.filter((g) => !g.builtin);
 
   function check() {
     try {
@@ -31,31 +36,21 @@ export function UploadPanel({ games, onAdd }: Props) {
     }
   }
 
+  function edit(yaml: string) {
+    setSource(yaml);
+    setIssues([]);
+    editor.current?.scrollIntoView({ behavior: 'smooth' });
+  }
+
   return (
     <>
-      <section className="card">
-        <h2>Upload a game</h2>
-        <p className="muted">Coming soon. This is where you'll add your own game:</p>
-        <ol className="steps">
-          <li>
-            <strong>Upload the rules</strong> (PDF, Word or text) and <strong>the card list</strong> (a spreadsheet, one row per card).
-          </li>
-          <li>
-            <strong>Answer a few questions</strong> Claude asks about anything unclear in the rules.
-          </li>
-          <li>
-            <strong>Watch one sample game</strong> to check it plays the way you expect, then simulate it like the built-in games.
-          </li>
-        </ol>
-        <div className="dropzone muted" aria-disabled="true">
-          Rules and card files will go here
-        </div>
-      </section>
+      <RulesUpload onAdd={onAdd} onOpenSettings={onOpenSettings} onEdit={edit} />
 
-      <section className="card">
-        <h2>Paste a game file</h2>
+      <section className="card" ref={editor}>
+        <h2>Paste or edit a game file</h2>
         <p className="muted">
-          Already have your game written as a <code>game.yaml</code> file? Paste it here. The format is described in{' '}
+          Already have your game written as a <code>game.yaml</code> file, or want to adjust one Claude wrote? Edit it here. The format is described
+          in{' '}
           <a href="https://github.com/patrickpoulin/cardtester/blob/main/docs/game-format.md" target="_blank" rel="noreferrer">
             docs/game-format.md
           </a>
@@ -63,7 +58,7 @@ export function UploadPanel({ games, onAdd }: Props) {
         </p>
         <label className="stack">
           Start from an example
-          <select value="" onChange={(e) => setSource(games.find((g) => g.game.id === e.target.value)?.source ?? '')}>
+          <select value="" onChange={(e) => edit(games.find((g) => g.game.id === e.target.value)?.source ?? '')}>
             <option value="" disabled>
               Choose a game to copy…
             </option>
@@ -96,8 +91,29 @@ export function UploadPanel({ games, onAdd }: Props) {
             </ul>
           </div>
         )}
-        <p className="muted small">Pasted games are kept until you leave the page. Save your file somewhere to reuse it.</p>
       </section>
+
+      {yours.length > 0 && (
+        <section className="card">
+          <h2>Your games</h2>
+          <p className="muted small">Kept in this browser. Use "Edit" to change a game, or copy its file somewhere safe to keep a backup.</p>
+          <ul className="game-list">
+            {yours.map((g) => (
+              <li key={g.game.id}>
+                <span>{g.game.name}</span>
+                <span className="nowrap">
+                  <button className="link" onClick={() => edit(g.source)}>
+                    Edit
+                  </button>
+                  <button className="link danger" onClick={() => onRemove(g.game.id)}>
+                    Delete
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
