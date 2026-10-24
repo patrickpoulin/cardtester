@@ -1,9 +1,11 @@
 import { getAgent } from './agents';
 import { Rng, gameSeed } from './rng';
-import { getGame } from '../games';
+import type { AnyGame } from './types';
 
 export interface SimConfig {
   gameId: string;
+  /** game.yaml text for games that aren't built in; workers compile it themselves. */
+  source?: string;
   numPlayers: number;
   /** Agent id per seat, e.g. ['greedy', 'random', 'random', 'random']. */
   agents: string[];
@@ -27,8 +29,7 @@ export interface GameRecord {
 
 const DEFAULT_MAX_ACTIONS = 10_000;
 
-export function validateConfig(config: SimConfig): void {
-  const game = getGame(config.gameId);
+export function validateConfig(game: AnyGame, config: SimConfig): void {
   if (config.numPlayers < game.minPlayers || config.numPlayers > game.maxPlayers) {
     throw new Error(`${game.name} needs ${game.minPlayers}-${game.maxPlayers} players, got ${config.numPlayers}`);
   }
@@ -39,8 +40,7 @@ export function validateConfig(config: SimConfig): void {
 }
 
 /** Plays game number `index` of a run. With `trace`, also returns a readable move-by-move log. */
-export function playGame(config: SimConfig, index: number, trace = false): { record: GameRecord; log: string[] } {
-  const game = getGame(config.gameId);
+export function playGame(game: AnyGame, config: SimConfig, index: number, trace = false): { record: GameRecord; log: string[] } {
   const agents = config.agents.map(getAgent);
   const rng = new Rng(gameSeed(config.seed, index));
   const state = game.setup(config.numPlayers, rng);
@@ -103,15 +103,16 @@ export function playGame(config: SimConfig, index: number, trace = false): { rec
 
 /** Plays games start..start+count-1. Used by both the browser workers and the CLI. */
 export function runBatch(
+  game: AnyGame,
   config: SimConfig,
   start: number,
   count: number,
   onProgress?: (done: number) => void,
 ): GameRecord[] {
-  validateConfig(config);
+  validateConfig(game, config);
   const records: GameRecord[] = [];
   for (let i = 0; i < count; i++) {
-    records.push(playGame(config, start + i).record);
+    records.push(playGame(game, config, start + i).record);
     if (onProgress && ((i + 1) % 50 === 0 || i + 1 === count)) onProgress(i + 1);
   }
   return records;

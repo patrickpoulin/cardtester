@@ -1,0 +1,85 @@
+id: crazy-eights
+name: Crazy Eights
+description: Match the suit or rank of the top card; eights are wild. First to empty their hand wins.
+players: { min: 2, max: 7 }
+scoreLabel: Penalty points left in hand (lower is better)
+timing:
+  setup: 90
+  actions: { play: 6, draw: 4, pass: 2 }
+
+# Variant notes: you may only draw when you have no playable card. If the card you draw is
+# playable you may play it, otherwise your turn ends. A blocked game (nobody can play or draw for
+# a full round) is won by the lowest penalty total.
+
+cards:
+  - deck: standard52
+    zone: deck
+
+zones:
+  shared:
+    deck: { visibility: hidden }
+    discard: { visibility: top }
+  player:
+    hand: { visibility: owner }
+
+vars:
+  shared:
+    activeSuit: null
+    drawnId: null # the card just drawn; it's the only card that may be played
+    passes: 0 # passes in a row; a full round of them ends a blocked game
+
+define:
+  playable: "c => c.rank == '8' or c.suit == activeSuit or c.rank == top(discard).rank"
+  penalty: "c => c.rank == '8' ? 50 : (c.value >= 11 ? 10 : c.value)"
+  canDraw: "len(deck) > 0 or len(discard) > 1"
+  canPlay: "any(me.hand, c => playable(c))"
+
+setup:
+  - shuffle: deck
+  - deal: { from: deck, to: hand, count: "numPlayers == 2 ? 7 : 5" }
+  # An eight can't start the discard pile.
+  - while: "top(deck).rank == '8'"
+    do:
+      - move: { from: deck, to: deck, position: bottom }
+  - move: { from: deck, to: discard }
+  - set: { var: activeSuit, value: "top(discard).suit" }
+
+actions:
+  - id: play
+    label: plays
+    card:
+      from: me.hand
+      where: "(drawnId == null or card.id == drawnId) and playable(card)"
+    choose:
+      suit: { options: "['♠', '♥', '♦', '♣']", when: "card.rank == '8'" }
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: activeSuit, value: "suit ?? card.suit" }
+      - set: { var: drawnId, value: null }
+      - set: { var: passes, value: 0 }
+    # Save eights for when you're stuck, and keep the suit you hold most of.
+    score: "(card.rank == '8' ? 1 : 20) + count(me.hand, c => c.id != card.id and c.suit == (suit ?? card.suit)) + penalty(card) / 100"
+
+  - id: draw
+    label: can't play, draws a card
+    when: "drawnId == null and not canPlay and canDraw"
+    endsTurn: false
+    effects:
+      - draw: { from: deck, to: me.hand, refill: { from: discard, keepTop: 1 } }
+      - set: { var: passes, value: 0 }
+      - if: "playable(top(me.hand))"
+        then:
+          - set: { var: drawnId, value: "top(me.hand).id" }
+        else:
+          - endTurn: true
+
+  - id: pass
+    label: passes
+    when: "drawnId != null or (not canPlay and not canDraw)"
+    effects:
+      - set: { var: drawnId, value: null }
+      - add: { var: passes, value: 1 }
+
+endWhen: "any(players, p => len(p.hand) == 0) or passes >= numPlayers"
+winners: "lowest(players, p => sum(p.hand, c => penalty(c)))"
+score: "sum(p.hand, c => penalty(c))"

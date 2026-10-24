@@ -1,0 +1,166 @@
+id: deck-builder
+name: Simple Deck-Builder
+description: Everyone starts with the same weak deck. Play action cards, spend coins to buy better cards, and finish with the most victory points.
+players: { min: 2, max: 4 }
+scoreLabel: Victory points
+timing:
+  setup: 180
+  default: 4
+  actions: { play: 8, buy: 8, end-turn: 6 }
+
+# Each turn: play action cards (one, unless a card gives more actions), then play all treasures
+# and buy cards whose cost you can afford (one buy, unless a card gives more), then discard
+# everything and draw 5 new cards. The game ends when the Provinces run out, when three supply
+# piles are empty, or after 30 turns each.
+
+zones:
+  shared:
+    supply: { visibility: public }
+  player:
+    deck: { visibility: hidden }
+    hand: { visibility: owner }
+    inPlay: { visibility: public }
+    discard: { visibility: public }
+
+vars:
+  shared:
+    phase: action
+  player:
+    actions: 1
+    buys: 1
+    coins: 0
+
+cards:
+  # Treasures
+  - name: Copper
+    count: 40
+    zone: supply
+    perPlayer: { count: 7, zone: deck }
+    attrs: { kind: treasure, cost: 0, coins: 1 }
+  - name: Silver
+    count: 40
+    zone: supply
+    attrs: { kind: treasure, cost: 3, coins: 2 }
+  - name: Gold
+    count: 30
+    zone: supply
+    attrs: { kind: treasure, cost: 6, coins: 3 }
+
+  # Victory cards
+  - name: Estate
+    count: 8
+    zone: supply
+    perPlayer: { count: 3, zone: deck }
+    attrs: { kind: victory, cost: 2, vp: 1 }
+  - name: Duchy
+    count: "numPlayers == 2 ? 8 : 12"
+    zone: supply
+    attrs: { kind: victory, cost: 5, vp: 3 }
+  - name: Province
+    count: "numPlayers == 2 ? 8 : 12"
+    zone: supply
+    attrs: { kind: victory, cost: 8, vp: 6 }
+
+  # Actions
+  - name: Village
+    count: 10
+    zone: supply
+    attrs: { kind: action, cost: 3 }
+    onPlay:
+      - draw: { from: me.deck, to: me.hand, count: 1, refill: { from: me.discard } }
+      - add: { var: me.actions, value: 2 }
+  - name: Smithy
+    count: 10
+    zone: supply
+    attrs: { kind: action, cost: 4 }
+    onPlay:
+      - draw: { from: me.deck, to: me.hand, count: 3, refill: { from: me.discard } }
+  - name: Market
+    count: 10
+    zone: supply
+    attrs: { kind: action, cost: 5 }
+    onPlay:
+      - draw: { from: me.deck, to: me.hand, count: 1, refill: { from: me.discard } }
+      - add: { var: me.actions, value: 1 }
+      - add: { var: me.buys, value: 1 }
+      - add: { var: me.coins, value: 1 }
+  - name: Laboratory
+    count: 10
+    zone: supply
+    attrs: { kind: action, cost: 5 }
+    onPlay:
+      - draw: { from: me.deck, to: me.hand, count: 2, refill: { from: me.discard } }
+      - add: { var: me.actions, value: 1 }
+
+define:
+  provincesLeft: "count(supply, c => c.name == 'Province')"
+  emptyPiles: "10 - len(unique(map(supply, c => c.name)))"
+  vp: "p => sum(concat(p.deck, p.hand, p.inPlay, p.discard), c => c.vp ?? 0)"
+
+setup:
+  - forEach:
+      in: players
+      as: p
+      do:
+        - shuffle: p.deck
+        - draw: { from: p.deck, to: p.hand, count: 5 }
+
+actions:
+  - id: play
+    label: plays
+    when: "phase == 'action' and me.actions > 0"
+    card: { from: me.hand, where: "card.kind == 'action'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: me.inPlay }
+      - add: { var: me.actions, value: -1 }
+      - runCard: card
+    score: "100 + card.cost"
+
+  - id: start-buying
+    label: plays treasures and starts buying
+    when: "phase == 'action'"
+    endsTurn: false
+    effects:
+      - set: { var: phase, value: "'buy'" }
+      - forEach:
+          in: "filter(me.hand, c => c.kind == 'treasure')"
+          as: c
+          do:
+            - move: { card: c, to: me.inPlay }
+            - add: { var: me.coins, value: c.coins }
+    score: 1
+
+  - id: buy
+    label: buys
+    when: "phase == 'buy' and me.buys > 0"
+    card: { from: supply, where: "card.cost <= me.coins" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: me.discard }
+      - add: { var: me.coins, value: -card.cost }
+      - add: { var: me.buys, value: -1 }
+    # "Big money" style: Provinces first, Duchies once Provinces run low, otherwise the most
+    # expensive card; never Copper or Estates.
+    score: >-
+      card.name == 'Copper' or card.name == 'Estate' ? -1
+        : card.name == 'Province' ? 100
+        : card.name == 'Duchy' ? (provincesLeft <= 4 ? 50 : -1)
+        : card.cost
+
+  - id: end-turn
+    label: ends their turn
+    when: "phase == 'buy'"
+    effects:
+      - move: { from: me.hand, to: me.discard, all: true }
+      - move: { from: me.inPlay, to: me.discard, all: true }
+      - draw: { from: me.deck, to: me.hand, count: 5, refill: { from: me.discard } }
+      - set: { var: me.actions, value: 1 }
+      - set: { var: me.buys, value: 1 }
+      - set: { var: me.coins, value: 0 }
+      - set: { var: phase, value: "'action'" }
+    score: 0
+
+endWhen: "provincesLeft == 0 or emptyPiles >= 3 or turn > 30 * numPlayers"
+winners: "highest(players, p => vp(p))"
+score: "vp(p)"
