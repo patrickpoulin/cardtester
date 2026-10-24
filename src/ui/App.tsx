@@ -5,21 +5,19 @@ import { deleteGame, listGames, saveGame } from '../report/storage';
 import { ComparePanel } from './ComparePanel';
 import { SavedRunsPanel } from './SavedRunsPanel';
 import { SimulatePanel } from './SimulatePanel';
-import { SettingsPanel } from './SettingsPanel';
 import { UploadPanel } from './UploadPanel';
 
 const TABS = [
+  { id: 'upload', label: 'Upload a Game' },
   { id: 'simulate', label: 'Simulate' },
   { id: 'compare', label: 'Compare' },
   { id: 'saved', label: 'Saved runs' },
-  { id: 'upload', label: 'Upload a game' },
-  { id: 'settings', label: 'Settings' },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('simulate');
+  const [tab, setTab] = useState<Tab>('upload');
   const [games, setGames] = useState<GameEntry[]>(BUILTIN_GAMES);
   const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
   const [savedVersion, setSavedVersion] = useState(0);
@@ -79,10 +77,7 @@ export function App() {
           <SavedRunsPanel version={savedVersion} />
         </div>
         <div hidden={tab !== 'upload'}>
-          <UploadPanel games={games} onAdd={addGame} onRemove={removeGame} onOpenSettings={() => setTab('settings')} />
-        </div>
-        <div hidden={tab !== 'settings'}>
-          <SettingsPanel />
+          <UploadPanel games={games} onAdd={addGame} onRemove={removeGame} />
         </div>
       </main>
     </div>
