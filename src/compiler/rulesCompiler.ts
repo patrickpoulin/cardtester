@@ -107,7 +107,8 @@ export class RulesCompiler {
     this.messages.push({ role: 'user', content });
     const params: RequestParams = {
       model: MODEL,
-      max_tokens: 64000,
+      // The model's full output limit: thinking counts against it too, and a big card list makes a long file.
+      max_tokens: 128000,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       // Caches the conversation so far, so follow-up turns don't pay again for the rulebook.
       cache_control: { type: 'ephemeral' },

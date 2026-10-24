@@ -4,6 +4,7 @@ import type { CompileResult, RulesCompiler, Status, Usage } from '../compiler/ru
 import { playGame } from '../engine/simulate';
 import type { GameEntry } from '../games';
 import { loadApiKey } from '../settings';
+import { downloadFile, slug } from './download';
 
 interface Props {
   onAdd(entry: GameEntry): void;
@@ -188,6 +189,9 @@ export function RulesUpload({ onAdd, onOpenSettings, onEdit }: Props) {
             )}
             <button disabled={running} onClick={() => onEdit(result.yaml)}>
               Edit the file by hand
+            </button>
+            <button onClick={() => downloadFile(`${slug(result.game?.name ?? '') || 'game'}.yaml`, result.yaml, 'text/yaml')}>
+              Download the game file
             </button>
           </div>
 
