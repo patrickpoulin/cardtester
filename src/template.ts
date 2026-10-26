@@ -5,7 +5,7 @@ import hearts from './games/hearts.yaml?raw';
 
 /*
  * What a designer gives Claude (in claude.ai, outside this site) to have it write a game.yaml: a
- * template file to attach alongside their rules and card list, and the prompts to send with it.
+ * template file to attach alongside their rules and card list.
  */
 
 export const TEMPLATE_FILE_NAME = 'card-tester-template.md';
@@ -19,13 +19,20 @@ statistics they get are only as good as the file you write.
 
 ## How to work
 
+The designer uploads two things to Card Tester: the game file you write, and their card list
+(CSV or Excel) as a separate file. Card Tester turns each row of the card list into a card, so
+**don't copy the card list into the game file.** The "Card lists" part of the format reference
+below explains how rows become cards and how their columns are named.
+
 Build the file in steps, so that no single reply has too much to do:
 
-1. **Core rules first.** Model the game from the rulebook only. If there is a card list, use a few
-   placeholder cards that cover its range (cheap, mid and expensive, for example) so the game can
-   be played. If the card list has fewer than about 40 cards, include them all now instead.
-2. **Cards in batches.** When asked, add the real cards about 40 at a time, adding only the rules
-   those cards need.
+1. **Core rules first.** Model the game from the rulebook. Add a \`cardList\` section saying where
+   listed cards go, and use the card list's column names (in camelCase) for card attributes in
+   expressions, so the real cards play from the start. If there is no card list, write the cards
+   entries yourself.
+2. **Card effects in batches.** When asked, go through the card list about 40 rows at a time and
+   add a cards entry, with just the card's exact name and its \`onPlay\` effects, for each card
+   whose text needs one, plus any rules those effects need.
 3. **Fixes.** When the designer pastes problems reported by Card Tester, fix every one.
 
 In every reply:
@@ -53,7 +60,9 @@ In every reply:
   negotiation or dice, must be approximated (for example, resolve simultaneous choices in turn
   order). Explain each approximation.
 - Deck building (sideboards, mulligans, point budgets) usually isn't modelled. Give each player a
-  fixed test deck and say how you chose it.
+  fixed test deck and say how you chose it. With a card list, decks come from its \`Count\` or
+  \`Per Player\` column and the \`cardList\` defaults; if the list has neither column, tell the
+  designer which one to add and what to put in it.
 - Every situation that can arise must leave the current player at least one legal action, and the
   game must always end. Add a pass action and a turn limit where needed.
 - Give each action a \`score\` expression describing sensible play, because the Casual bot always
@@ -61,14 +70,12 @@ In every reply:
   \`scoreOrder\`, \`scoreLabel\`, and \`timing\` estimates in seconds for a real table.
 - Use the game's own name. The \`id\` is the name in lowercase with hyphens.
 
-## Card lists
+## Card effects
 
-- Create one \`cards\` entry per distinct card with its count and its columns as \`attrs\`
-  (cost, type, attack and so on, with short lowercase keys).
 - Turn each card's text into \`onPlay\` effects where the format can express it. If it can only be
   approximated, approximate it and add a comment \`# approximated: <how>\`. If it can't be
-  expressed at all, keep the card with its attrs, leave out \`onPlay\`, and add
-  \`# not modelled: <reason>\`.
+  expressed at all, leave the card out and list it.
+- Never repeat a card's attributes in its entry; they come from the card list.
 - After the file, list the cards that are approximated or not modelled, one line each.
 
 ## Format reference
@@ -93,31 +100,5 @@ ${hearts}\`\`\`
 ${deckBuilder}\`\`\`
 `;
 
-export interface ClaudePrompt {
-  title: string;
-  when: string;
-  text: string;
-}
-
-export const PROMPTS: ClaudePrompt[] = [
-  {
-    title: 'Start: the core rules',
-    when: 'Send first, with your rulebook, your card list (if you have one) and the template attached.',
-    text: `Attached are my card game's rulebook, my card list, and ${TEMPLATE_FILE_NAME}. Follow the template to write a game.yaml for Card Tester. Do step 1 only: model the core rules with placeholder cards, list your simplifications and any questions, then give me the complete file.`,
-  },
-  {
-    title: 'Add cards in batches',
-    when: 'Once the core file loads in Card Tester. Repeat with the next rows until every card is in.',
-    text: 'That file works. Now add the cards in rows 1 to 40 of my card list, following step 2 of the template. Give me the complete updated file, then list any cards that are approximated or not modelled.',
-  },
-  {
-    title: 'Fix problems',
-    when: 'When Card Tester reports problems with a file. Paste them after the prompt.',
-    text: 'Card Tester reported these problems with the file. Fix every one and give me the complete corrected file:',
-  },
-  {
-    title: 'Continue a cut-off file',
-    when: "If Claude's reply stops before the file is finished.",
-    text: 'Continue the file exactly where you stopped, in a new yaml code block.',
-  },
-];
+/** Starts the message a designer sends Claude with the problems Card Tester found in a file. */
+export const FIX_PROMPT = 'Card Tester reported these problems with the file. Fix every one and give me the complete corrected file:';
