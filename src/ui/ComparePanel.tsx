@@ -20,7 +20,9 @@ interface Props {
 
 export function ComparePanel({ games, selectedId, onSelect, onSaved }: Props) {
   const entry = games.find((g) => g.game.id === selectedId) ?? games[0];
-  const [setup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
+  const [rawSetup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
+  // The game can also be selected from another page, so the player count is fitted to it here.
+  const setup = fitSetup(rawSetup, entry.game);
   const [variant, setVariant] = useState(entry.source);
   const [variantOf, setVariantOf] = useState(entry.game.id);
   const [running, setRunning] = useState(false);

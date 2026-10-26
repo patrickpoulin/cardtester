@@ -7,11 +7,13 @@
 #
 # Every section is explained below. The full reference is docs/game-format.md.
 # To make your own game: change the cards, abilities and locations, keep what
-# fits, and paste the result into "Upload a game → Paste or edit a game file".
+# fits, and upload the file on the Upload a Game page. Card attributes can also
+# come from a card list (see the card list template); rows update the cards
+# entries below by name.
 # =============================================================================
 
-id: lane-clash # lowercase letters, digits and hyphens
-name: Lane Clash
+id: lane-clash # change this to your own game's id: lowercase letters, digits and hyphens
+name: Lane Clash # and this to its name
 description: A Marvel Snap-style lane battler. Over 6 turns, play cards to three locations; win two locations to win the game.
 players: { min: 2, max: 2 }
 scoreLabel: Locations won
@@ -34,28 +36,30 @@ timing:
 # CARDS
 # Each player gets one copy of each card (perPlayer) in their own deck.
 # attrs are any values your rules need. Here: cost (energy), power, and the
-# ability text for readers. onPlay effects run when the card is played
-# ("On Reveal"). Ongoing abilities are applied in lanePower (see define).
+# ability text for readers. With a card list, these come from its columns
+# instead (Cost becomes card.cost, Ability becomes card.ability).
+# onPlay effects run when the card is played ("On Reveal"). Ongoing abilities
+# are applied in lanePower (see define).
 # Inside onPlay, `card` is the card itself and `lane` is the location it was
 # played to (1, 2 or 3).
 # -----------------------------------------------------------------------------
 cards:
   - name: Scout
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 1, power: 2, text: "" }
+    attrs: { cost: 1, power: 2, ability: "" }
   - name: Lookout
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 1, power: 1, text: "On Reveal: draw a card." }
+    attrs: { cost: 1, power: 1, ability: "On Reveal: draw a card." }
     onPlay:
       - if: "len(me.hand) < 7"
         then:
           - draw: { from: me.deck, to: me.hand }
   - name: Squire
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 2, power: 3, text: "" }
+    attrs: { cost: 2, power: 3, ability: "" }
   - name: Medic
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 2, power: 2, text: "On Reveal: your other cards here get +1 power." }
+    attrs: { cost: 2, power: 2, ability: "On Reveal: your other cards here get +1 power." }
     onPlay:
       - forEach:
           in: "filter(laneOf(me, lane), c => c.id != card.id)"
@@ -64,17 +68,17 @@ cards:
             - add: { var: c.power, value: 1 }
   - name: Trickster
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 2, power: 1, text: "On Reveal: if your opponent has a card here, +3 power." }
+    attrs: { cost: 2, power: 1, ability: "On Reveal: if your opponent has a card here, +3 power." }
     onPlay:
       - if: "len(laneOf(opponent(me), lane)) > 0"
         then:
           - add: { var: card.power, value: 3 }
   - name: Banner Bearer
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 3, power: 3, text: "Ongoing: your other cards here have +1 power." }
+    attrs: { cost: 3, power: 3, ability: "Ongoing: your other cards here have +1 power." }
   - name: Saboteur
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 3, power: 3, text: "On Reveal: enemy cards here get -1 power." }
+    attrs: { cost: 3, power: 3, ability: "On Reveal: enemy cards here get -1 power." }
     onPlay:
       - forEach:
           in: "laneOf(opponent(me), lane)"
@@ -83,23 +87,23 @@ cards:
             - add: { var: c.power, value: -1 }
   - name: Guard
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 3, power: 4, text: "" }
+    attrs: { cost: 3, power: 4, ability: "" }
   - name: Knight
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 4, power: 6, text: "" }
+    attrs: { cost: 4, power: 6, ability: "" }
   - name: Siege Engine
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 4, power: 4, text: "On Reveal: if this is your only card here, +4 power." }
+    attrs: { cost: 4, power: 4, ability: "On Reveal: if this is your only card here, +4 power." }
     onPlay:
       - if: "len(laneOf(me, lane)) == 1"
         then:
           - add: { var: card.power, value: 4 }
   - name: Giant
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 5, power: 9, text: "" }
+    attrs: { cost: 5, power: 9, ability: "" }
   - name: Dragon
     perPlayer: { count: 1, zone: deck }
-    attrs: { cost: 6, power: 12, text: "" }
+    attrs: { cost: 6, power: 12, ability: "" }
 
 # -----------------------------------------------------------------------------
 # ZONES: where cards can be. Each player has a deck, a hand, and their side of

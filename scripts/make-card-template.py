@@ -1,6 +1,8 @@
 """Writes the card list templates in public/templates/ (an .xlsx and a .csv).
 
 The cards match src/games/lane-clash.yaml; tests/templates.test.ts checks they stay in sync.
+Columns follow Card Tester's card list rules (docs/game-format.md, "Card lists"): Name names the
+card, Per Player puts copies in each player's deck, and every other column becomes an attribute.
 Run from the repository root: python3 scripts/make-card-template.py
 """
 
@@ -8,7 +10,7 @@ import csv
 import zipfile
 from xml.sax.saxutils import escape
 
-CARD_COLUMNS = ['name', 'count', 'cost', 'power', 'ability type', 'ability', 'notes']
+CARD_COLUMNS = ['Name', 'Per Player', 'Cost', 'Power', 'Ability Type', 'Ability', 'Notes']
 CARDS = [
     ['Scout', 1, 1, 2, '', '', 'A cheap card to play on turn 1.'],
     ['Lookout', 1, 1, 1, 'On Reveal', 'Draw a card.', 'Only if you hold fewer than 7 cards.'],
@@ -23,7 +25,7 @@ CARDS = [
     ['Giant', 1, 5, 9, '', '', ''],
     ['Dragon', 1, 6, 12, '', '', 'The most expensive card; only playable on turn 6.'],
 ]
-LOCATION_COLUMNS = ['location', 'effect']
+LOCATION_COLUMNS = ['Location', 'Effect']
 LOCATIONS = [
     ['Plains', 'No effect.'],
     ['Forge', 'Cards played here get +1 power.'],
@@ -32,16 +34,17 @@ LOCATIONS = [
 HELP = [
     ['How to fill in this card list'],
     [''],
-    ['One row per different card. Delete the example rows and add your own.'],
-    ['name: the card name exactly as it appears in your rules.'],
-    ['count: how many copies are in the game (or in each deck; say which in your rules or the notes column).'],
-    ['cost, power: numbers. Rename, remove or add columns to fit your game, e.g. suit, colour, victory points.'],
-    ['ability type and ability: what the card does, in plain English, as printed on the card.'],
-    ['notes: anything that helps explain the card, such as timing, limits or which deck it belongs to.'],
+    ['One row per different card, on the first sheet. Delete the example rows and add your own.'],
+    ['Name: the card name exactly as it appears in your rules. Each name must be unique.'],
+    ['Per Player: how many copies go in each player\'s deck. For one shared pile, use a Count column instead (and Zone to say which pile).'],
+    ['Every other column becomes a card attribute the game file can use, named in camelCase: Cost is card.cost, Ability Type is card.abilityType.'],
+    ['Number cells stay numbers. Rename, remove or add columns to fit your game, e.g. Suit, Colour, Victory Points.'],
+    ['Ability Type and Ability: what the card does, in plain English, as printed on the card. Claude turns this into rules.'],
+    ['Notes: anything that helps explain the card, such as timing, limits or which deck it belongs to.'],
     [''],
-    ['The Locations sheet is optional; use it for boards, locations or other non-card pieces with effects.'],
-    ['Upload this file as the card list on the "Upload a game" page, together with your rulebook.'],
-    ['Excel (.xlsx) and CSV both work. Claude reads every sheet with data.'],
+    ['Card Tester reads only the first sheet. The Locations sheet and this one are notes for Claude:'],
+    ['attach this file, your rulebook and the Card Tester template to a chat in claude.ai to have Claude write the game file.'],
+    ['Then upload the game file and this card list on the Upload a Game page. Excel (.xlsx) and CSV both work.'],
 ]
 
 

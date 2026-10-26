@@ -2,8 +2,9 @@ import { useRef, useState } from 'react';
 import { GameDefinitionError, loadGame } from '../dsl/compile';
 import { smokeTest } from '../dsl/smoke';
 import type { GameEntry } from '../games';
+import { type CardRow, mergeCardList, readCardList } from '../cardList';
+import { FIX_PROMPT, TEMPLATE, TEMPLATE_FILE_NAME } from '../template';
 import { downloadFile } from './download';
-import { RulesUpload } from './RulesUpload';
 
 const TEMPLATES = `${import.meta.env.BASE_URL}templates/`;
 
@@ -11,18 +12,34 @@ interface Props {
   games: GameEntry[];
   onAdd(entry: GameEntry): void;
   onRemove(id: string): void;
-  onOpenSettings(): void;
 }
 
-export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
+function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {},
+    );
+  }
+  return <button onClick={copy}>{copied ? 'Copied' : label}</button>;
+}
+
+export function UploadPanel({ games, onAdd, onRemove }: Props) {
   const [source, setSource] = useState('');
   const [issues, setIssues] = useState<string[]>([]);
+  const [cardList, setCardList] = useState<{ fileName: string; rows: CardRow[] } | null>(null);
+  const [cardListError, setCardListError] = useState('');
   const editor = useRef<HTMLElement>(null);
   const yours = games.filter((g) => !g.builtin);
 
-  function check() {
+  function check(text = source, rows = cardList?.rows ?? null) {
     try {
-      const game = loadGame(source);
+      text = mergeCardList(text, rows);
+      const game = loadGame(text);
       if (games.some((g) => g.builtin && g.game.id === game.id)) {
         setIssues([`id: "${game.id}" is a built-in game; give your game a different id`]);
         return;
@@ -33,7 +50,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
         return;
       }
       setIssues([]);
-      onAdd({ game, source, builtin: false });
+      onAdd({ game, source: text, builtin: false });
     } catch (err) {
       setIssues(err instanceof GameDefinitionError ? err.issues : [err instanceof Error ? err.message : String(err)]);
     }
@@ -45,22 +62,57 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
     editor.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
+  async function openFile(file: File | undefined) {
+    if (!file) return;
+    const text = await file.text();
+    setSource(text);
+    check(text);
+  }
+
+  async function openCardList(file: File | undefined) {
+    if (!file) return;
+    try {
+      setCardList({ fileName: file.name, rows: await readCardList(file) });
+      setCardListError('');
+    } catch (err) {
+      setCardList(null);
+      setCardListError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  const fixPrompt = `${FIX_PROMPT}\n${issues.map((i) => `- ${i}`).join('\n')}`;
+
   const builtins = games.filter((g) => g.builtin);
-  const template = builtins.find((g) => g.game.id === 'lane-clash');
+  const example = builtins.find((g) => g.game.id === 'lane-clash');
 
   return (
     <>
       <section className="card">
-        <h2>Templates</h2>
-        <p className="muted">Starting points for your own game. Fill them in and upload them below, or edit the game file directly.</p>
+        <h2>Game File Template</h2>
+        <p className="muted">
+          Attach the template to a chat in{' '}
+          <a href="https://claude.ai" target="_blank" rel="noreferrer">
+            claude.ai
+          </a>{' '}
+          with your rulebook and card list, and ask Claude to follow it. It tells Claude how to write your game file a step at a time, and
+          includes the full file format with four example games.
+        </p>
+        <div className="actions">
+          <button className="primary" onClick={() => downloadFile(TEMPLATE_FILE_NAME, TEMPLATE, 'text/markdown')}>
+            Download the template
+          </button>
+        </div>
+
+        <h3>Examples to start from</h3>
         <ul className="template-list">
-          {template && (
+          {example && (
             <li>
-              <button className="link inline" onClick={() => downloadFile('lane-clash.yaml', template.source, 'text/yaml')}>
-                Game file template (.yaml)
+              <button className="link inline" onClick={() => downloadFile('lane-clash.yaml', example.source, 'text/yaml')}>
+                Example game file: Lane Clash (.yaml)
               </button>
               <span className="muted small">
-                Lane Clash, a Marvel Snap-style game with three locations, energy, and On Reveal and Ongoing abilities. Every section is explained.
+                A Marvel Snap-style game with three locations, energy, On Reveal and Ongoing abilities, and location effects. Every section is
+                explained, so you can copy it and change the parts that differ.
               </span>
             </li>
           )}
@@ -68,19 +120,22 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
             <a href={`${TEMPLATES}card-list-template.xlsx`} download>
               Card list template (Excel)
             </a>
-            <span className="muted small">Lane Clash's cards and locations as an example, with a sheet explaining each column.</span>
+            <span className="muted small">
+              Lane Clash's cards as example rows, with a sheet explaining each column. Card Tester reads the first sheet; the others are notes
+              for Claude.
+            </span>
           </li>
           <li>
             <a href={`${TEMPLATES}card-list-template.csv`} download>
               Card list template (CSV)
             </a>
-            <span className="muted small">The same card list as a CSV file.</span>
+            <span className="muted small">The same cards as a CSV file.</span>
           </li>
         </ul>
         <p className="muted small">
           More example game files:{' '}
           {builtins
-            .filter((g) => g !== template)
+            .filter((g) => g !== example)
             .map((g, i) => (
               <span key={g.game.id}>
                 {i > 0 && ' · '}
@@ -92,18 +147,47 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
         </p>
       </section>
 
-      <RulesUpload onAdd={onAdd} onOpenSettings={onOpenSettings} onEdit={edit} />
-
       <section className="card" ref={editor}>
-        <h2>Paste or edit a game file</h2>
+        <h2>Upload Your Game File</h2>
         <p className="muted">
-          Already have your game written as a <code>game.yaml</code> file, or want to adjust one Claude wrote? Edit it here. The format is described
-          in{' '}
+          Upload the <code>game.yaml</code> Claude wrote, or paste it below, and your card list if the game has one. Each row of the card
+          list becomes a card. The game is checked and played in a few test games before it's added. The format is described in{' '}
           <a href="https://github.com/patrickpoulin/cardtester/blob/main/docs/game-format.md" target="_blank" rel="noreferrer">
             docs/game-format.md
           </a>
           .
         </p>
+        <label className="stack">
+          Game file
+          <input
+            type="file"
+            accept=".yaml,.yml,.txt"
+            onChange={(e) => {
+              openFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <label className="stack">
+          Card list (CSV or Excel, optional)
+          <input
+            type="file"
+            accept=".csv,.tsv,.txt,.xlsx"
+            onChange={(e) => {
+              openCardList(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        {cardList && (
+          <p className="muted small">
+            {cardList.fileName}: {cardList.rows.length} {cardList.rows.length === 1 ? 'card' : 'cards'} will be added to the game file.{' '}
+            <button className="link" onClick={() => setCardList(null)}>
+              Remove
+            </button>
+          </p>
+        )}
+        {cardListError && <p className="error">{cardListError}</p>}
         <label className="stack">
           Start from an example
           <select value="" onChange={(e) => edit(games.find((g) => g.game.id === e.target.value)?.source ?? '')}>
@@ -122,7 +206,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
           <textarea className="code" rows={18} spellCheck={false} value={source} onChange={(e) => setSource(e.target.value)} />
         </label>
         <div className="actions">
-          <button className="primary" onClick={check} disabled={!source.trim()}>
+          <button className="primary" onClick={() => check()} disabled={!source.trim()}>
             Check and add game
           </button>
         </div>
@@ -137,6 +221,9 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
                 <li key={i}>{issue}</li>
               ))}
             </ul>
+            <div className="actions">
+              <CopyButton text={fixPrompt} label="Copy as a prompt for Claude" />
+            </div>
           </div>
         )}
       </section>
@@ -144,7 +231,7 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
       {yours.length > 0 && (
         <section className="card">
           <h2>Your games</h2>
-          <p className="muted small">Kept in this browser. Use "Edit" to change a game, or copy its file somewhere safe to keep a backup.</p>
+          <p className="muted small">Kept in this browser. Download a game to keep a backup or use it in another browser.</p>
           <ul className="game-list">
             {yours.map((g) => (
               <li key={g.game.id}>
@@ -152,6 +239,9 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
                 <span className="nowrap">
                   <button className="link" onClick={() => edit(g.source)}>
                     Edit
+                  </button>
+                  <button className="link" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
+                    Download
                   </button>
                   <button className="link danger" onClick={() => onRemove(g.game.id)}>
                     Delete

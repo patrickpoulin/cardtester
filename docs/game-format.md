@@ -37,6 +37,7 @@ When the game ends, `winners` decides who won and `score` gives each player's fi
 | `scoreOrder` | | `higher` (default) or `lower`: whether a high or a low final score is good; used for winning margins |
 | `timing` | | Real-world seconds for the playtime estimate: `{ setup: 90, default: 4, actions: { play: 6 } }` |
 | `cards` | yes | The cards in the game (see below) |
+| `cardList` | | Where the rows of an uploaded card list go (see [Card lists](#card-lists)) |
 | `zones` | yes | Where cards can be (see below) |
 | `vars` | | Numbers, text or true/false values the rules keep track of |
 | `define` | | Named expressions and helper functions |
@@ -67,6 +68,34 @@ Every card has `id` (unique number), `name`, and its `attrs`. Standard-deck card
 (`"A"`, `"2"` … `"10"`, `"J"`, `"Q"`, `"K"`), `suit` (`"♠"`, `"♥"`, `"♦"`, `"♣"`), `color`
 (`"red"`/`"black"`), `value` (A = 1 … K = 13) and `rankHigh` (like `value` but A = 14).
 A card that has been moved during a player's turn also has `by`: the number of that player.
+
+### Card lists
+
+A game with many cards can keep them in a spreadsheet (CSV, TSV or Excel `.xlsx`) uploaded beside
+the game file on the Upload a Game page. Each row becomes a cards entry:
+
+- The card's name comes from the `Name`, `Card Name`, `Card`, `Unique ID` or `ID` column (the
+  first column if there is none of these).
+- `Count` (or `Copies`, `Quantity`) is how many copies go in `Zone`; `Per Player` and
+  `Player Zone` work like `perPlayer`.
+- Every other column becomes an attribute, named in camelCase: `Casting Cost` is `card.castingCost`,
+  `Card Type` is `card.cardType`. Number cells are numbers. Empty cells are left out.
+
+The game file says where listed cards go when a row has no placement columns:
+
+```yaml
+cardList: { perPlayer: { count: 1, zone: deck } }   # or { count: 1, zone: deck } for a shared pile
+```
+
+A cards entry with the same name as a row is updated from the row (placement and attributes) and
+keeps its `onPlay`, so the game file only needs entries for cards with effects:
+
+```yaml
+cards:
+  - name: Treasure Map
+    onPlay:
+      - draw: { from: me.deck, to: me.hand, count: "card.draws" }
+```
 
 ## Zones
 

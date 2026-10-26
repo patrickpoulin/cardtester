@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
-  const [setup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
+  const [rawSetup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ summary: Summary; records: GameRecord[]; elapsed: number } | null>(null);
@@ -24,6 +24,8 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
   const [error, setError] = useState('');
 
   const entry = games.find((g) => g.game.id === selectedId) ?? games[0];
+  // The game can also be selected from another page, so the player count is fitted to it here.
+  const setup = fitSetup(rawSetup, entry.game);
   const game = entry.game;
   const config = configFor(entry, setup);
 

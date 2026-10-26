@@ -1,4 +1,4 @@
-name,count,cost,power,ability type,ability,notes
+Name,Per Player,Cost,Power,Ability Type,Ability,Notes
 Scout,1,1,2,,,A cheap card to play on turn 1.
 Lookout,1,1,1,On Reveal,Draw a card.,Only if you hold fewer than 7 cards.
 Squire,1,2,3,,,
