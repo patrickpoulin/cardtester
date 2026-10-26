@@ -2,7 +2,10 @@ import { useRef, useState } from 'react';
 import { GameDefinitionError, loadGame } from '../dsl/compile';
 import { smokeTest } from '../dsl/smoke';
 import type { GameEntry } from '../games';
+import { downloadFile } from './download';
 import { RulesUpload } from './RulesUpload';
+
+const TEMPLATES = `${import.meta.env.BASE_URL}templates/`;
 
 interface Props {
   games: GameEntry[];
@@ -42,8 +45,53 @@ export function UploadPanel({ games, onAdd, onRemove, onOpenSettings }: Props) {
     editor.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
+  const builtins = games.filter((g) => g.builtin);
+  const template = builtins.find((g) => g.game.id === 'lane-clash');
+
   return (
     <>
+      <section className="card">
+        <h2>Templates</h2>
+        <p className="muted">Starting points for your own game. Fill them in and upload them below, or edit the game file directly.</p>
+        <ul className="template-list">
+          {template && (
+            <li>
+              <button className="link inline" onClick={() => downloadFile('lane-clash.yaml', template.source, 'text/yaml')}>
+                Game file template (.yaml)
+              </button>
+              <span className="muted small">
+                Lane Clash, a Marvel Snap-style game with three locations, energy, and On Reveal and Ongoing abilities. Every section is explained.
+              </span>
+            </li>
+          )}
+          <li>
+            <a href={`${TEMPLATES}card-list-template.xlsx`} download>
+              Card list template (Excel)
+            </a>
+            <span className="muted small">Lane Clash's cards and locations as an example, with a sheet explaining each column.</span>
+          </li>
+          <li>
+            <a href={`${TEMPLATES}card-list-template.csv`} download>
+              Card list template (CSV)
+            </a>
+            <span className="muted small">The same card list as a CSV file.</span>
+          </li>
+        </ul>
+        <p className="muted small">
+          More example game files:{' '}
+          {builtins
+            .filter((g) => g !== template)
+            .map((g, i) => (
+              <span key={g.game.id}>
+                {i > 0 && ' · '}
+                <button className="link inline" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
+                  {g.game.name}
+                </button>
+              </span>
+            ))}
+        </p>
+      </section>
+
       <RulesUpload onAdd={onAdd} onOpenSettings={onOpenSettings} onEdit={edit} />
 
       <section className="card" ref={editor}>

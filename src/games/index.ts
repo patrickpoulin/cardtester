@@ -4,6 +4,7 @@ import type { AnyGame } from '../engine/types';
 import crazyEights from './crazy-eights.yaml?raw';
 import hearts from './hearts.yaml?raw';
 import deckBuilder from './deck-builder.yaml?raw';
+import laneClash from './lane-clash.yaml?raw';
 
 export interface GameEntry {
   game: AnyGame;
@@ -12,7 +13,7 @@ export interface GameEntry {
   builtin: boolean;
 }
 
-export const BUILTIN_GAMES: GameEntry[] = [crazyEights, hearts, deckBuilder].map((source) => ({
+export const BUILTIN_GAMES: GameEntry[] = [crazyEights, hearts, deckBuilder, laneClash].map((source) => ({
   game: loadGame(source),
   source,
   builtin: true,
