@@ -19,11 +19,11 @@ could just be luck. Every run is kept under **Saved runs**, where any two can be
 
 **Upload a Game** is where your own games come in. Card Tester plays games written as a
 `game.yaml` file ([format reference](docs/game-format.md)). Download the template from that page
-and attach it, with your rulebook and card list, to a chat in claude.ai. The page gives the
-prompts to send: Claude writes the core rules first, then adds the cards in batches. Upload or
-paste each file Claude writes; the app validates it and plays test games, and any problems can be
-copied straight back to Claude as a prompt. Your games are kept in your browser, and each can be
-downloaded as a backup.
+and attach it, with your rulebook and card list, to a chat in claude.ai: it tells Claude how to
+write the file a step at a time. Then upload the game file and, separately, your card list (CSV or
+Excel), whose rows become the game's cards. The app validates the game and plays test games, and
+any problems can be copied straight back to Claude. Your games are kept in your browser, and each
+can be downloaded as a backup.
 
 ## Development
 
@@ -48,7 +48,8 @@ npm run sim -- --file my-game.yaml --players 3
 | `src/games/` | Built-in games as `game.yaml` files |
 | `docs/game-format.md` | Reference for writing game files |
 | `src/worker/`, `src/runner.ts` | Splits a run across one Web Worker per CPU core |
-| `src/template.ts` | The template and prompts designers give Claude to write a `game.yaml` |
+| `src/template.ts` | The template designers give Claude to write a `game.yaml` |
+| `src/cardList.ts` | Reading an uploaded card list (CSV or Excel) and merging its rows into the game file |
 | `src/ui/` | React interface |
 | `cli/` | Command-line runner using the same engine |
 | `tests/` | Vitest tests; `tests/reference/crazyEights.ts` is a hand-written Crazy Eights used to check the interpreter |
