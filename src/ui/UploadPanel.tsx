@@ -6,6 +6,8 @@ import { type CardRow, mergeCardList, readCardList } from '../cardList';
 import { FIX_PROMPT, TEMPLATE, TEMPLATE_FILE_NAME } from '../template';
 import { downloadFile } from './download';
 
+const TEMPLATES = `${import.meta.env.BASE_URL}templates/`;
+
 interface Props {
   games: GameEntry[];
   onAdd(entry: GameEntry): void;
@@ -80,6 +82,9 @@ export function UploadPanel({ games, onAdd, onRemove }: Props) {
 
   const fixPrompt = `${FIX_PROMPT}\n${issues.map((i) => `- ${i}`).join('\n')}`;
 
+  const builtins = games.filter((g) => g.builtin);
+  const example = builtins.find((g) => g.game.id === 'lane-clash');
+
   return (
     <>
       <section className="card">
@@ -90,13 +95,56 @@ export function UploadPanel({ games, onAdd, onRemove }: Props) {
             claude.ai
           </a>{' '}
           with your rulebook and card list, and ask Claude to follow it. It tells Claude how to write your game file a step at a time, and
-          includes the full file format with three example games.
+          includes the full file format with four example games.
         </p>
         <div className="actions">
           <button className="primary" onClick={() => downloadFile(TEMPLATE_FILE_NAME, TEMPLATE, 'text/markdown')}>
             Download the template
           </button>
         </div>
+
+        <h3>Examples to start from</h3>
+        <ul className="template-list">
+          {example && (
+            <li>
+              <button className="link inline" onClick={() => downloadFile('lane-clash.yaml', example.source, 'text/yaml')}>
+                Example game file: Lane Clash (.yaml)
+              </button>
+              <span className="muted small">
+                A Marvel Snap-style game with three locations, energy, On Reveal and Ongoing abilities, and location effects. Every section is
+                explained, so you can copy it and change the parts that differ.
+              </span>
+            </li>
+          )}
+          <li>
+            <a href={`${TEMPLATES}card-list-template.xlsx`} download>
+              Card list template (Excel)
+            </a>
+            <span className="muted small">
+              Lane Clash's cards as example rows, with a sheet explaining each column. Card Tester reads the first sheet; the others are notes
+              for Claude.
+            </span>
+          </li>
+          <li>
+            <a href={`${TEMPLATES}card-list-template.csv`} download>
+              Card list template (CSV)
+            </a>
+            <span className="muted small">The same cards as a CSV file.</span>
+          </li>
+        </ul>
+        <p className="muted small">
+          More example game files:{' '}
+          {builtins
+            .filter((g) => g !== example)
+            .map((g, i) => (
+              <span key={g.game.id}>
+                {i > 0 && ' · '}
+                <button className="link inline" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
+                  {g.game.name}
+                </button>
+              </span>
+            ))}
+        </p>
       </section>
 
       <section className="card" ref={editor}>

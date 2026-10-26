@@ -6,5 +6,6 @@ export default defineConfig({
   base: '/cardtester/',
   plugins: [react()],
   worker: { format: 'es' },
-  test: { include: ['tests/**/*.test.ts'] },
+  // Some tests play hundreds of full games, which can exceed the 5 s default on slower machines.
+  test: { include: ['tests/**/*.test.ts'], testTimeout: 30_000 },
 });

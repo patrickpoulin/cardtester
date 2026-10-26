@@ -2,6 +2,7 @@ import formatReference from '../docs/game-format.md?raw';
 import crazyEights from './games/crazy-eights.yaml?raw';
 import deckBuilder from './games/deck-builder.yaml?raw';
 import hearts from './games/hearts.yaml?raw';
+import laneClash from './games/lane-clash.yaml?raw';
 
 /*
  * What a designer gives Claude (in claude.ai, outside this site) to have it write a game.yaml: a
@@ -98,6 +99,11 @@ ${hearts}\`\`\`
 
 \`\`\`yaml
 ${deckBuilder}\`\`\`
+
+### lane-clash.yaml
+
+\`\`\`yaml
+${laneClash}\`\`\`
 `;
 
 /** Starts the message a designer sends Claude with the problems Card Tester found in a file. */

@@ -1,0 +1,205 @@
+# =============================================================================
+# GAME FILE TEMPLATE: Lane Clash (Marvel Snap-style mechanics)
+#
+# A complete, playable game you can copy and adapt. It uses the mechanics of
+# Marvel Snap with original cards: 3 locations, 6 turns, energy that grows each
+# turn, 12-card decks, On Reveal and Ongoing abilities, and location effects.
+#
+# Every section is explained below. The full reference is docs/game-format.md.
+# To make your own game: change the cards, abilities and locations, keep what
+# fits, and upload the file on the Upload a Game page. Card attributes can also
+# come from a card list (see the card list template); rows update the cards
+# entries below by name.
+# =============================================================================
+
+id: lane-clash # change this to your own game's id: lowercase letters, digits and hyphens
+name: Lane Clash # and this to its name
+description: A Marvel Snap-style lane battler. Over 6 turns, play cards to three locations; win two locations to win the game.
+players: { min: 2, max: 2 }
+scoreLabel: Locations won
+scoreOrder: higher
+
+# Seconds a real player takes, used for the playtime estimate.
+timing:
+  setup: 30
+  actions: { play: 8, end-turn: 3 }
+
+# Simplifications compared with Marvel Snap:
+# - Players take turns instead of playing at the same time, and a card's
+#   On Reveal happens as soon as it's played. Player 1 always acts first each
+#   turn, so Player 2 sees what Player 1 did (the report will show whether
+#   that is an advantage).
+# - Locations are known from the start instead of revealing on turns 1-3.
+# - No snapping or cubes: a game is simply won or lost.
+
+# -----------------------------------------------------------------------------
+# CARDS
+# Each player gets one copy of each card (perPlayer) in their own deck.
+# attrs are any values your rules need. Here: cost (energy), power, and the
+# ability text for readers. With a card list, these come from its columns
+# instead (Cost becomes card.cost, Ability becomes card.ability).
+# onPlay effects run when the card is played ("On Reveal"). Ongoing abilities
+# are applied in lanePower (see define).
+# Inside onPlay, `card` is the card itself and `lane` is the location it was
+# played to (1, 2 or 3).
+# -----------------------------------------------------------------------------
+cards:
+  - name: Scout
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 1, power: 2, ability: "" }
+  - name: Lookout
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 1, power: 1, ability: "On Reveal: draw a card." }
+    onPlay:
+      - if: "len(me.hand) < 7"
+        then:
+          - draw: { from: me.deck, to: me.hand }
+  - name: Squire
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 2, power: 3, ability: "" }
+  - name: Medic
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 2, power: 2, ability: "On Reveal: your other cards here get +1 power." }
+    onPlay:
+      - forEach:
+          in: "filter(laneOf(me, lane), c => c.id != card.id)"
+          as: c
+          do:
+            - add: { var: c.power, value: 1 }
+  - name: Trickster
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 2, power: 1, ability: "On Reveal: if your opponent has a card here, +3 power." }
+    onPlay:
+      - if: "len(laneOf(opponent(me), lane)) > 0"
+        then:
+          - add: { var: card.power, value: 3 }
+  - name: Banner Bearer
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 3, power: 3, ability: "Ongoing: your other cards here have +1 power." }
+  - name: Saboteur
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 3, power: 3, ability: "On Reveal: enemy cards here get -1 power." }
+    onPlay:
+      - forEach:
+          in: "laneOf(opponent(me), lane)"
+          as: c
+          do:
+            - add: { var: c.power, value: -1 }
+  - name: Guard
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 3, power: 4, ability: "" }
+  - name: Knight
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 4, power: 6, ability: "" }
+  - name: Siege Engine
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 4, power: 4, ability: "On Reveal: if this is your only card here, +4 power." }
+    onPlay:
+      - if: "len(laneOf(me, lane)) == 1"
+        then:
+          - add: { var: card.power, value: 4 }
+  - name: Giant
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 5, power: 9, ability: "" }
+  - name: Dragon
+    perPlayer: { count: 1, zone: deck }
+    attrs: { cost: 6, power: 12, ability: "" }
+
+# -----------------------------------------------------------------------------
+# ZONES: where cards can be. Each player has a deck, a hand, and their side of
+# each of the three locations.
+# -----------------------------------------------------------------------------
+zones:
+  player:
+    deck: { visibility: hidden }
+    hand: { visibility: owner }
+    lane1: { visibility: public }
+    lane2: { visibility: public }
+    lane3: { visibility: public }
+
+# -----------------------------------------------------------------------------
+# VARIABLES: numbers the rules keep track of.
+# -----------------------------------------------------------------------------
+vars:
+  shared:
+    snapTurn: 1 # the game turn (1-6); both players act once per turn
+  player:
+    energy: 0 # refilled to the turn number at the start of each turn
+
+# -----------------------------------------------------------------------------
+# DEFINE: named helpers used by the rules below.
+# Locations: 1 = Plains (no effect), 2 = Forge (cards played here get +1
+# power), 3 = Bog (Ongoing: cards here have -1 power).
+# -----------------------------------------------------------------------------
+define:
+  laneOf: "(p, l) => l == 1 ? p.lane1 : (l == 2 ? p.lane2 : p.lane3)"
+  opponent: "p => players[1 - p.index]"
+  lanePower: >-
+    (p, l) => sum(laneOf(p, l), c => c.power)
+      + count(laneOf(p, l), c => c.name == 'Banner Bearer') * (len(laneOf(p, l)) - 1)
+      - (l == 3 ? len(laneOf(p, l)) : 0)
+  locationsWon: "p => count([1, 2, 3], l => lanePower(p, l) > lanePower(opponent(p), l))"
+  totalPower: "p => lanePower(p, 1) + lanePower(p, 2) + lanePower(p, 3)"
+  openLanes: "filter([1, 2, 3], l => len(laneOf(me, l)) < 4)" # 4 cards per side, max
+
+# -----------------------------------------------------------------------------
+# SETUP AND TURNS
+# Each player shuffles and draws 3. At the start of every turn the player draws
+# a card (hand limit 7) and gets energy equal to the turn number.
+# -----------------------------------------------------------------------------
+setup:
+  - forEach:
+      in: players
+      as: p
+      do:
+        - shuffle: p.deck
+        - draw: { from: p.deck, to: p.hand, count: 3 }
+
+turn:
+  start:
+    - if: "len(me.hand) < 7"
+      then:
+        - draw: { from: me.deck, to: me.hand }
+    - set: { var: me.energy, value: snapTurn }
+
+# -----------------------------------------------------------------------------
+# ACTIONS: what a player can do on their turn. `score` describes sensible play
+# for the Casual bot, which always picks the highest-scoring move.
+# -----------------------------------------------------------------------------
+actions:
+  - id: play
+    label: plays
+    card: { from: me.hand, where: "card.cost <= me.energy" }
+    choose:
+      lane: { options: openLanes }
+    endsTurn: false # play as many cards as your energy allows
+    effects:
+      - move: { card: card, to: "laneOf(me, lane)" }
+      - add: { var: me.energy, value: -card.cost }
+      - if: "lane == 2" # Forge
+        then:
+          - add: { var: card.power, value: 1 }
+      - runCard: card # On Reveal
+    # Prefer strong cards, contested locations, and avoid the Bog.
+    score: >-
+      10 * (card.power + (lane == 2 ? 1 : 0) - (lane == 3 ? 1 : 0))
+        + (lanePower(me, lane) <= lanePower(opponent(me), lane) ? 15 : 0)
+        + card.cost
+
+  - id: end-turn
+    label: ends their turn
+    effects:
+      - if: "current == numPlayers - 1" # both players have acted
+        then:
+          - add: { var: snapTurn, value: 1 }
+    score: 0
+
+# -----------------------------------------------------------------------------
+# ENDING AND WINNING
+# After turn 6, whoever wins more locations wins. A tie on locations goes to
+# total power; a full tie is a shared win.
+# -----------------------------------------------------------------------------
+endWhen: "snapTurn > 6"
+winners: "highest(players, p => locationsWon(p) * 1000 + totalPower(p))"
+score: "locationsWon(p)"
+progress: "locationsWon(p) * 1000 + totalPower(p)" # who is ahead mid-game
