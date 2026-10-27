@@ -70,7 +70,7 @@ export function DeckUpload({ games, onAdd, onRemove }: Props) {
         <summary>Deck columns and effects</summary>
         <p className="muted small">
           One row per card: Name, Per Player (copies in each player's deck, 1 if empty), Cost and Power (0 if empty), Effect, Amount, and Ability (the
-          card text, for people; it isn't used in play). Effect is optional and must be one of these:
+          card text, for people; it isn't used in play). Columns named Casting Cost, Attack or Text work as Cost, Power and Ability, and other columns are ignored. Effect is optional and must be one of these:
         </p>
         <table className="effects">
           <tbody>
