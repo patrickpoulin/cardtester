@@ -501,3 +501,7 @@ input[type='file'] {
 table.effects {
   margin: 4px 0 8px;
 }
+
+.source + .stack {
+  margin-top: 12px;
+}

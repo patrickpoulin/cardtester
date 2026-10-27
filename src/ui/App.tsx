@@ -4,12 +4,11 @@ import { isDeckGame } from '../deck';
 import { BUILTIN_GAMES, type GameEntry } from '../games';
 import { deleteGame, listGames, saveGame } from '../report/storage';
 import { ComparePanel } from './ComparePanel';
+import { DeckUpload } from './DeckUpload';
 import { SavedRunsPanel } from './SavedRunsPanel';
 import { SimulatePanel } from './SimulatePanel';
-import { UploadPanel } from './UploadPanel';
 
 const TABS = [
-  { id: 'upload', label: 'Upload a Deck' },
   { id: 'simulate', label: 'Simulate' },
   { id: 'compare', label: 'Compare' },
   { id: 'saved', label: 'Saved runs' },
@@ -18,7 +17,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id'];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('upload');
+  const [tab, setTab] = useState<Tab>('simulate');
   const [games, setGames] = useState<GameEntry[]>(BUILTIN_GAMES);
   const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
   const [savedVersion, setSavedVersion] = useState(0);
@@ -69,6 +68,7 @@ export function App() {
       </header>
       <main>
         <div hidden={tab !== 'simulate'}>
+          <DeckUpload games={games} onAdd={addGame} onRemove={removeGame} />
           <SimulatePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
         </div>
         <div hidden={tab !== 'compare'}>
@@ -76,9 +76,6 @@ export function App() {
         </div>
         <div hidden={tab !== 'saved'}>
           <SavedRunsPanel version={savedVersion} />
-        </div>
-        <div hidden={tab !== 'upload'}>
-          <UploadPanel games={games} onAdd={addGame} onRemove={removeGame} />
         </div>
       </main>
     </div>

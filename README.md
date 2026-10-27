@@ -17,10 +17,10 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 versions are played with the same shuffles. The report says which differences are real and which
 could just be luck. Every run is kept under **Saved runs**, where any two can be compared.
 
-**Upload a Deck** is where new cards come in. The rules of Not Snap stay fixed
+New cards come in through **Upload Your Deck** at the top of the Simulate page. The rules of Not Snap stay fixed
 (`src/games/not-snap.yaml`); a deck is a spreadsheet (Excel or CSV) with one row per card: Name,
 Per Player, Cost, Power, and optionally an Effect from a fixed list with its Amount. Download the
-deck template from that page (it holds the starter deck), change the cards, and upload it. The app
+deck template there (it holds the starter deck), change the cards, and upload it. The app
 checks the deck, plays test games, and adds it to Simulate and Compare as "Not Snap: <deck name>".
 Decks are kept in your browser and can be downloaded again as CSV.
 
