@@ -4,7 +4,7 @@
 # The rules below are fixed; decks change. Each card is just numbers from a
 # deck list: cost, power, and optionally one ability (effect + amount). The
 # abilities are carried out by the `play` action and `lanePower`, so any deck
-# uploaded on the Upload a Deck page plays with the same rules. The cards here
+# uploaded on the Simulate page plays with the same rules. The cards here
 # are the starter deck, the same as the deck template.
 # =============================================================================
 
