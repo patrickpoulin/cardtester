@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
-import { GameDefinitionError, loadGame } from '../dsl/compile';
+import { useState } from 'react';
+import { type CardRow, readCardList } from '../cardList';
+import { DeckError, deckCsv, deckGame, EFFECTS } from '../deck';
+import { GameDefinitionError } from '../dsl/compile';
 import { smokeTest } from '../dsl/smoke';
-import type { GameEntry } from '../games';
-import { type CardRow, mergeCardList, readCardList } from '../cardList';
-import { FIX_PROMPT, TEMPLATE, TEMPLATE_FILE_NAME } from '../template';
+import { type GameEntry, NOT_SNAP_RULES } from '../games';
 import { downloadFile } from './download';
 
 const TEMPLATES = `${import.meta.env.BASE_URL}templates/`;
@@ -14,233 +14,136 @@ interface Props {
   onRemove(id: string): void;
 }
 
-function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  function copy() {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      },
-      () => {},
-    );
-  }
-  return <button onClick={copy}>{copied ? 'Copied' : label}</button>;
-}
-
 export function UploadPanel({ games, onAdd, onRemove }: Props) {
-  const [source, setSource] = useState('');
+  const [deck, setDeck] = useState<{ fileName: string; rows: CardRow[] } | null>(null);
+  const [deckName, setDeckName] = useState('');
   const [issues, setIssues] = useState<string[]>([]);
-  const [cardList, setCardList] = useState<{ fileName: string; rows: CardRow[] } | null>(null);
-  const [cardListError, setCardListError] = useState('');
-  const editor = useRef<HTMLElement>(null);
-  const yours = games.filter((g) => !g.builtin);
+  const decks = games.filter((g) => !g.builtin);
 
-  function check(text = source, rows = cardList?.rows ?? null) {
+  async function openDeck(file: File | undefined) {
+    if (!file) return;
+    setIssues([]);
     try {
-      text = mergeCardList(text, rows);
-      const game = loadGame(text);
-      if (games.some((g) => g.builtin && g.game.id === game.id)) {
-        setIssues([`id: "${game.id}" is a built-in game; give your game a different id`]);
-        return;
-      }
-      const problems = smokeTest(game);
+      setDeck({ fileName: file.name, rows: await readCardList(file) });
+      setDeckName(file.name.replace(/\.[^.]+$/, ''));
+    } catch (err) {
+      setDeck(null);
+      setIssues([err instanceof Error ? err.message : String(err)]);
+    }
+  }
+
+  function check() {
+    if (!deck) return;
+    try {
+      const entry = deckGame(NOT_SNAP_RULES, deck.rows, deckName);
+      const problems = smokeTest(entry.game);
       if (problems.length) {
         setIssues(problems);
         return;
       }
       setIssues([]);
-      onAdd({ game, source: text, builtin: false });
+      setDeck(null);
+      onAdd(entry);
     } catch (err) {
-      setIssues(err instanceof GameDefinitionError ? err.issues : [err instanceof Error ? err.message : String(err)]);
+      setIssues(
+        err instanceof DeckError || err instanceof GameDefinitionError ? err.issues : [err instanceof Error ? err.message : String(err)],
+      );
     }
   }
-
-  function edit(yaml: string) {
-    setSource(yaml);
-    setIssues([]);
-    editor.current?.scrollIntoView({ behavior: 'smooth' });
-  }
-
-  async function openFile(file: File | undefined) {
-    if (!file) return;
-    const text = await file.text();
-    setSource(text);
-    check(text);
-  }
-
-  async function openCardList(file: File | undefined) {
-    if (!file) return;
-    try {
-      setCardList({ fileName: file.name, rows: await readCardList(file) });
-      setCardListError('');
-    } catch (err) {
-      setCardList(null);
-      setCardListError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  const fixPrompt = `${FIX_PROMPT}\n${issues.map((i) => `- ${i}`).join('\n')}`;
-
-  const builtins = games.filter((g) => g.builtin);
-  const example = builtins.find((g) => g.game.id === 'lane-clash');
 
   return (
     <>
       <section className="card">
-        <h2>Game File Template</h2>
+        <h2>Not Snap</h2>
         <p className="muted">
-          Attach the template to a chat in{' '}
-          <a href="https://claude.ai" target="_blank" rel="noreferrer">
-            claude.ai
-          </a>{' '}
-          with your rulebook and card list, and ask Claude to follow it. It tells Claude how to write your game file a step at a time, and
-          includes the full file format with four example games.
+          Card Tester plays Not Snap, a Marvel Snap-style game: two players, six turns, three locations, energy that grows each turn, and
+          whoever wins two locations wins. The rules stay the same; what you test is a new deck of cards. Each card has a cost, a power and
+          optionally one of these abilities:
         </p>
-        <div className="actions">
-          <button className="primary" onClick={() => downloadFile(TEMPLATE_FILE_NAME, TEMPLATE, 'text/markdown')}>
-            Download the template
-          </button>
-        </div>
-
-        <h3>Examples to start from</h3>
-        <ul className="template-list">
-          {example && (
-            <li>
-              <button className="link inline" onClick={() => downloadFile('lane-clash.yaml', example.source, 'text/yaml')}>
-                Example game file: Lane Clash (.yaml)
-              </button>
-              <span className="muted small">
-                A Marvel Snap-style game with three locations, energy, On Reveal and Ongoing abilities, and location effects. Every section is
-                explained, so you can copy it and change the parts that differ.
-              </span>
-            </li>
-          )}
-          <li>
-            <a href={`${TEMPLATES}card-list-template.xlsx`} download>
-              Card list template (Excel)
-            </a>
-            <span className="muted small">
-              Lane Clash's cards as example rows, with a sheet explaining each column. Card Tester reads the first sheet; the others are notes
-              for Claude.
-            </span>
-          </li>
-          <li>
-            <a href={`${TEMPLATES}card-list-template.csv`} download>
-              Card list template (CSV)
-            </a>
-            <span className="muted small">The same cards as a CSV file.</span>
-          </li>
-        </ul>
-        <p className="muted small">
-          More example game files:{' '}
-          {builtins
-            .filter((g) => g !== example)
-            .map((g, i) => (
-              <span key={g.game.id}>
-                {i > 0 && ' · '}
-                <button className="link inline" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
-                  {g.game.name}
-                </button>
-              </span>
+        <table className="effects">
+          <thead>
+            <tr>
+              <th>Effect</th>
+              <th>What it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            {EFFECTS.map((e) => (
+              <tr key={e.id}>
+                <td className="nowrap">{e.label}</td>
+                <td>{e.description}</td>
+              </tr>
             ))}
+          </tbody>
+        </table>
+        <p className="muted small">Locations: Plains has no effect, cards played to the Forge get +1 power, and cards in the Bog have -1 power.</p>
+        <div className="actions">
+          <a className="button primary" href={`${TEMPLATES}deck-template.xlsx`} download>
+            Download the deck template (Excel)
+          </a>
+          <button onClick={() => downloadFile('deck-template.csv', deckCsv(NOT_SNAP_RULES))}>Download it as CSV</button>
+        </div>
+        <p className="muted small">
+          The template holds the starter deck, one row per card: Name, Per Player (copies in each player's deck, 1 if empty), Cost, Power,
+          Effect, Amount, and Ability (the card text, for people; it isn't used in play).
         </p>
       </section>
 
-      <section className="card" ref={editor}>
-        <h2>Upload Your Game File</h2>
+      <section className="card">
+        <h2>Upload Your Deck</h2>
         <p className="muted">
-          Upload the <code>game.yaml</code> Claude wrote, or paste it below, and your card list if the game has one. Each row of the card
-          list becomes a card. The game is checked and played in a few test games before it's added. The format is described in{' '}
-          <a href="https://github.com/patrickpoulin/cardtester/blob/main/docs/game-format.md" target="_blank" rel="noreferrer">
-            docs/game-format.md
-          </a>
-          .
+          Upload your deck as Excel (.xlsx) or CSV. It's checked and played in a few test games, then added to the Simulate and Compare
+          tabs, where you can test it against the starter deck.
         </p>
         <label className="stack">
-          Game file
+          Deck file
           <input
             type="file"
-            accept=".yaml,.yml,.txt"
+            accept=".xlsx,.csv,.tsv,.txt"
             onChange={(e) => {
-              openFile(e.target.files?.[0]);
+              openDeck(e.target.files?.[0]);
               e.target.value = '';
             }}
           />
         </label>
-        <label className="stack">
-          Card list (CSV or Excel, optional)
-          <input
-            type="file"
-            accept=".csv,.tsv,.txt,.xlsx"
-            onChange={(e) => {
-              openCardList(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-        </label>
-        {cardList && (
-          <p className="muted small">
-            {cardList.fileName}: {cardList.rows.length} {cardList.rows.length === 1 ? 'card' : 'cards'} will be added to the game file.{' '}
-            <button className="link" onClick={() => setCardList(null)}>
-              Remove
-            </button>
-          </p>
+        {deck && (
+          <>
+            <p className="muted small">
+              {deck.fileName}: {deck.rows.length} {deck.rows.length === 1 ? 'card' : 'cards'}
+            </p>
+            <label className="stack">
+              Deck name
+              <input type="text" value={deckName} onChange={(e) => setDeckName(e.target.value)} />
+            </label>
+          </>
         )}
-        {cardListError && <p className="error">{cardListError}</p>}
-        <label className="stack">
-          Start from an example
-          <select value="" onChange={(e) => edit(games.find((g) => g.game.id === e.target.value)?.source ?? '')}>
-            <option value="" disabled>
-              Choose a game to copy…
-            </option>
-            {games.map((g) => (
-              <option key={g.game.id} value={g.game.id}>
-                {g.game.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="stack">
-          game.yaml
-          <textarea className="code" rows={18} spellCheck={false} value={source} onChange={(e) => setSource(e.target.value)} />
-        </label>
         <div className="actions">
-          <button className="primary" onClick={() => check()} disabled={!source.trim()}>
-            Check and add game
+          <button className="primary" onClick={check} disabled={!deck || !deckName.trim()}>
+            Check and add deck
           </button>
         </div>
         {issues.length > 0 && (
           <div className="error">
-            <p>
-              {issues.length === 1 ? 'There is a problem' : `There are ${issues.length} problems`} with the file or with test games played
-              from it:
-            </p>
+            <p>{issues.length === 1 ? 'There is a problem' : `There are ${issues.length} problems`} with the deck:</p>
             <ul className="issues">
               {issues.map((issue, i) => (
                 <li key={i}>{issue}</li>
               ))}
             </ul>
-            <div className="actions">
-              <CopyButton text={fixPrompt} label="Copy as a prompt for Claude" />
-            </div>
           </div>
         )}
       </section>
 
-      {yours.length > 0 && (
+      {decks.length > 0 && (
         <section className="card">
-          <h2>Your games</h2>
-          <p className="muted small">Kept in this browser. Download a game to keep a backup or use it in another browser.</p>
+          <h2>Your decks</h2>
+          <p className="muted small">Kept in this browser. Download a deck to keep a backup, edit it, or use it in another browser.</p>
           <ul className="game-list">
-            {yours.map((g) => (
+            {decks.map((g) => (
               <li key={g.game.id}>
                 <span>{g.game.name}</span>
                 <span className="nowrap">
-                  <button className="link" onClick={() => edit(g.source)}>
-                    Edit
-                  </button>
-                  <button className="link" onClick={() => downloadFile(`${g.game.id}.yaml`, g.source, 'text/yaml')}>
+                  <button className="link" onClick={() => downloadFile(`${g.game.id}.csv`, deckCsv(g.source))}>
                     Download
                   </button>
                   <button className="link danger" onClick={() => onRemove(g.game.id)}>

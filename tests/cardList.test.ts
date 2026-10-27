@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { attrName, CardListError, cardRows, mergeCardList, parseDelimited } from '../src/cardList';
 import { loadGame } from '../src/dsl/compile';
-import deckBuilder from '../src/games/deck-builder.yaml?raw';
+import deckBuilder from './fixtures/games/deck-builder.yaml?raw';
 
 describe('card lists', () => {
   it('parses CSV with quotes and guesses TSV', () => {

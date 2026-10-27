@@ -1,11 +1,12 @@
 # The game.yaml format
 
-A game file describes a card game's components and rules so Card Tester can play it. The built-in
-games in [`src/games/`](../src/games) are complete examples:
+A game file describes a card game's components and rules so Card Tester can play it. [`src/games/not-snap.yaml`](../src/games/not-snap.yaml)
+(the site's game) and the engine's test games in [`tests/fixtures/games/`](../tests/fixtures/games)
+are complete examples:
 
-- [`crazy-eights.yaml`](../src/games/crazy-eights.yaml): shedding game, choices (naming a suit), drawing with reshuffles
-- [`hearts.yaml`](../src/games/hearts.yaml): trick-taking, rounds, scoring across rounds
-- [`deck-builder.yaml`](../src/games/deck-builder.yaml): custom cards with effects, turn phases, per-player decks
+- [`crazy-eights.yaml`](../tests/fixtures/games/crazy-eights.yaml): shedding game, choices (naming a suit), drawing with reshuffles
+- [`hearts.yaml`](../tests/fixtures/games/hearts.yaml): trick-taking, rounds, scoring across rounds
+- [`deck-builder.yaml`](../tests/fixtures/games/deck-builder.yaml): custom cards with effects, turn phases, per-player decks
 
 A file is checked when it is loaded, and every problem is reported with its location,
 e.g. `actions[0].effects[2].move.to: "hands" is not a player zone`.
@@ -71,8 +72,8 @@ A card that has been moved during a player's turn also has `by`: the number of t
 
 ### Card lists
 
-A game with many cards can keep them in a spreadsheet (CSV, TSV or Excel `.xlsx`) uploaded beside
-the game file on the Upload a Game page. Each row becomes a cards entry:
+A game with many cards can keep them in a spreadsheet (CSV, TSV or Excel `.xlsx`) merged into
+the game file (Not Snap decks are read this way). Each row becomes a cards entry:
 
 - The card's name comes from the `Name`, `Card Name`, `Card`, `Unique ID` or `ID` column (the
   first column if there is none of these).

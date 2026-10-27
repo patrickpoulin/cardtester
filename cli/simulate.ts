@@ -1,5 +1,5 @@
 // Command-line runner: same engine as the website, for large runs or scripting.
-// Usage: npm run sim -- --game crazy-eights --players 4 --games 1000 --agents greedy,random --seed 1 [--json]
+// Usage: npm run sim -- --game not-snap --players 2 --games 1000 --agents greedy,random --seed 1 [--json]
 //        npm run sim -- --file path/to/game.yaml --players 3
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -15,9 +15,9 @@ const builtinIds = readdirSync(gamesDir)
 
 const { values } = parseArgs({
   options: {
-    game: { type: 'string', default: 'crazy-eights' },
+    game: { type: 'string', default: 'not-snap' },
     file: { type: 'string' },
-    players: { type: 'string', default: '4' },
+    players: { type: 'string', default: '2' },
     games: { type: 'string', default: '1000' },
     agents: { type: 'string', default: 'greedy' },
     seed: { type: 'string', default: '1' },

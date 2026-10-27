@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadGame } from '../dsl/compile';
+import { isDeckGame } from '../deck';
 import { BUILTIN_GAMES, type GameEntry } from '../games';
 import { deleteGame, listGames, saveGame } from '../report/storage';
 import { ComparePanel } from './ComparePanel';
@@ -8,7 +9,7 @@ import { SimulatePanel } from './SimulatePanel';
 import { UploadPanel } from './UploadPanel';
 
 const TABS = [
-  { id: 'upload', label: 'Upload a Game' },
+  { id: 'upload', label: 'Upload a Deck' },
   { id: 'simulate', label: 'Simulate' },
   { id: 'compare', label: 'Compare' },
   { id: 'saved', label: 'Saved runs' },
@@ -23,11 +24,11 @@ export function App() {
   const [savedVersion, setSavedVersion] = useState(0);
   const onSaved = () => setSavedVersion((v) => v + 1);
 
-  // Bring back games uploaded or pasted on earlier visits.
+  // Bring back decks uploaded on earlier visits (games saved before the site became Not Snap-only are skipped).
   useEffect(() => {
     listGames()
       .then((saved) => {
-        const entries = saved.flatMap((g) => {
+        const entries = saved.filter((g) => isDeckGame(g.id)).flatMap((g) => {
           try {
             return [{ game: loadGame(g.source), source: g.source, builtin: false }];
           } catch {

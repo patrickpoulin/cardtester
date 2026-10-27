@@ -139,11 +139,23 @@ button {
   cursor: pointer;
 }
 
+a.button {
+  display: inline-block;
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--surface);
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
+a.button.primary,
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -485,23 +497,7 @@ input[type='file'] {
   border-bottom: 1px solid var(--border);
 }
 
-.template-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-}
 
-.template-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.template-list a,
-.template-list button.link {
-  font-weight: 600;
-  align-self: flex-start;
-  text-decoration: none;
+table.effects {
+  margin: 4px 0 8px;
 }
