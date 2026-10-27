@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { loadGame } from '../src/dsl/compile';
 import { runBatch, type SimConfig } from '../src/engine/simulate';
 import { computeStats } from '../src/engine/stats';
-import { BUILTIN_GAMES } from '../src/games';
+import { TEST_GAMES } from './fixtures/games';
 import { SIGNIFICANCE, compareSummaries, normalCdf, twoProportionP, welchP } from '../src/report/compare';
 import { comparisonCsv, recordsCsv, summaryCsv } from '../src/report/csv';
 import { diffLines } from '../src/report/diff';
 
-const entry = (id: string) => BUILTIN_GAMES.find((e) => e.game.id === id)!;
+const entry = (id: string) => TEST_GAMES.find((e) => e.game.id === id)!;
 const config = (gameId: string, numPlayers: number, agents = ['greedy']): SimConfig => ({
   gameId,
   numPlayers,

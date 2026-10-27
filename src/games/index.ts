@@ -1,10 +1,7 @@
 import { loadGame } from '../dsl/compile';
 import type { SimConfig } from '../engine/simulate';
 import type { AnyGame } from '../engine/types';
-import crazyEights from './crazy-eights.yaml?raw';
-import hearts from './hearts.yaml?raw';
-import deckBuilder from './deck-builder.yaml?raw';
-import laneClash from './lane-clash.yaml?raw';
+import notSnap from './not-snap.yaml?raw';
 
 export interface GameEntry {
   game: AnyGame;
@@ -13,7 +10,10 @@ export interface GameEntry {
   builtin: boolean;
 }
 
-export const BUILTIN_GAMES: GameEntry[] = [crazyEights, hearts, deckBuilder, laneClash].map((source) => ({
+/** The rules every uploaded deck is played with. */
+export const NOT_SNAP_RULES = notSnap;
+
+export const BUILTIN_GAMES: GameEntry[] = [notSnap].map((source) => ({
   game: loadGame(source),
   source,
   builtin: true,

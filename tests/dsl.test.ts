@@ -5,7 +5,7 @@ import { runBatch, type SimConfig } from '../src/engine/simulate';
 import { computeStats } from '../src/engine/stats';
 import { Rng } from '../src/engine/rng';
 import type { AnyGame } from '../src/engine/types';
-import { BUILTIN_GAMES } from '../src/games';
+import { TEST_GAMES } from './fixtures/games';
 import { crazyEights as reference } from './reference/crazyEights';
 
 const config = (game: AnyGame, numPlayers: number, agents = ['greedy']): SimConfig => ({
@@ -15,7 +15,7 @@ const config = (game: AnyGame, numPlayers: number, agents = ['greedy']): SimConf
   seed: 7,
 });
 
-const game = (id: string) => BUILTIN_GAMES.find((e) => e.game.id === id)!.game;
+const game = (id: string) => TEST_GAMES.find((e) => e.game.id === id)!.game;
 
 /** A tiny valid game: take turns drawing; first to hold 3 cards wins. */
 const RACE = `
@@ -90,7 +90,7 @@ describe('game.yaml validation', () => {
 
 describe('smoke test', () => {
   it('passes the built-in games', () => {
-    for (const { game: g } of BUILTIN_GAMES) expect(smokeTest(g, 3)).toEqual([]);
+    for (const { game: g } of TEST_GAMES) expect(smokeTest(g, 3)).toEqual([]);
   });
 
   it('catches misspelled fields and games that never end', () => {
@@ -103,7 +103,7 @@ describe('smoke test', () => {
 });
 
 describe('built-in games', () => {
-  it.each(BUILTIN_GAMES.map((e) => e.game.id))('%s finishes every game for each player count', (id) => {
+  it.each(TEST_GAMES.map((e) => e.game.id))('%s finishes every game for each player count', (id) => {
     const g = game(id);
     for (let n = g.minPlayers; n <= g.maxPlayers; n++) {
       for (const r of runBatch(g, config(g, n, ['random', 'greedy']), 0, 60)) {
@@ -113,7 +113,7 @@ describe('built-in games', () => {
     }
   });
 
-  it.each(BUILTIN_GAMES.map((e) => e.game.id))('%s never loses or duplicates cards', (id) => {
+  it.each(TEST_GAMES.map((e) => e.game.id))('%s never loses or duplicates cards', (id) => {
     const g = game(id);
     const rng = new Rng(11);
     const state = g.setup(g.minPlayers, rng) as DslState;
