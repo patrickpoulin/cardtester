@@ -37,13 +37,28 @@ const effectId = (value: string) => {
   return EFFECTS.find((e) => e.id.replace(/-/g, '') === key || e.label.toLowerCase().replace(/[^a-z]+/g, '') === key)?.id;
 };
 
-/** Checks each row and turns its Effect into the id the rules use. Each player gets Per Player (or Count) copies of a card, one by default. */
+// Other names card lists use for the deck columns, as attribute names (see attrName): "Casting Cost" is castingCost.
+const ALIASES: Record<string, string[]> = {
+  cost: ['castingCost', 'manaCost', 'energyCost', 'energy', 'mana'],
+  power: ['attack', 'atk', 'strength'],
+  ability: ['text', 'cardText', 'rulesText', 'abilityText'],
+};
+
+/** Checks each row (an empty Cost or Power is 0) and turns its Effect into the id the rules use. Each player gets Per Player (or Count) copies of a card, one by default. */
 export function normalizeDeck(rows: CardRow[]): CardRow[] {
   const issues: string[] = [];
   const cards = rows.map((row) => {
     const attrs = { ...row.attrs };
+    for (const [key, names] of Object.entries(ALIASES)) {
+      if (key in attrs) continue;
+      const alias = names.find((n) => n in attrs);
+      if (alias === undefined) continue;
+      attrs[key] = attrs[alias];
+      delete attrs[alias];
+    }
     const problem = (text: string) => issues.push(`${row.name}: ${text}`);
     for (const key of ['cost', 'power'] as const) {
+      attrs[key] ??= 0; // an empty cell counts as 0
       const v = attrs[key];
       if (typeof v !== 'number' || !Number.isInteger(v)) problem(`${key === 'cost' ? 'Cost' : 'Power'} must be a whole number`);
     }

@@ -24,8 +24,8 @@ h.append(['Column','What it means'])
 for c in h[1]: c.font=Font(bold=True)
 for r in [('Name',"The card's name. Required, and each name only once."),
  ('Per Player',"Copies of the card in each player's deck. Empty means 1."),
- ('Cost','Energy needed to play it (a whole number). Required.'),
- ('Power','Its power at a location (a whole number). Required.'),
+ ('Cost','Energy needed to play it (a whole number). Empty counts as 0.'),
+ ('Power','Its power at a location (a whole number). Empty counts as 0.'),
  ('Effect','Optional ability: one of the effects below. Leave empty for no ability.'),
  ('Amount','The number the Effect uses. Required when Effect is set.'),
  ('Ability','The card text, for people reading the deck. Not used by the simulator.')]:

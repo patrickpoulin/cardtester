@@ -38,10 +38,25 @@ describe('Not Snap decks', () => {
     expect(smokeTest(entry.game, 3)).toEqual([]);
   });
 
+  it('counts an empty Cost or Power as 0', () => {
+    const entry = deckGame(NOT_SNAP_RULES, rows('Name,Cost,Power\nSpell,2,\nLegend,,\n'), 'x');
+    expect(parseGameYaml(entry.source).cards.map((c) => ('attrs' in c ? c.attrs : undefined))).toEqual([
+      { cost: 2, power: 0 },
+      { cost: 0, power: 0 },
+    ]);
+  });
+
+  it('reads Casting Cost, Attack and Text as Cost, Power and Ability', () => {
+    const entry = deckGame(NOT_SNAP_RULES, rows('Unique ID,Card Type,Casting Cost,Attack,Text\nImp,Companion,2,3,Hits hard\n'), 'x');
+    expect(parseGameYaml(entry.source).cards.map((c) => ('attrs' in c ? c.attrs : undefined))).toEqual([
+      { cardType: 'Companion', cost: 2, power: 3, ability: 'Hits hard' },
+    ]);
+  });
+
   it('accepts effect names in any case and reports bad rows together', () => {
     expect(() => deckGame(NOT_SNAP_RULES, rows('Name,Cost,Power,Effect,Amount\nA,1,1,ONGOING boost,2\n'), 'x')).not.toThrow();
     try {
-      deckGame(NOT_SNAP_RULES, rows('Name,Cost,Power,Effect,Amount\nA,1,,,\nB,1,1,Explode,2\nC,1,1,Draw,\n'), 'x');
+      deckGame(NOT_SNAP_RULES, rows('Name,Cost,Power,Effect,Amount\nA,1,2.5,,\nB,1,1,Explode,2\nC,1,1,Draw,\n'), 'x');
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(DeckError);
