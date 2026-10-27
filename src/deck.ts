@@ -37,13 +37,14 @@ const effectId = (value: string) => {
   return EFFECTS.find((e) => e.id.replace(/-/g, '') === key || e.label.toLowerCase().replace(/[^a-z]+/g, '') === key)?.id;
 };
 
-/** Checks each row and turns its Effect into the id the rules use. Each player gets Per Player (or Count) copies of a card, one by default. */
+/** Checks each row (an empty Cost or Power is 0) and turns its Effect into the id the rules use. Each player gets Per Player (or Count) copies of a card, one by default. */
 export function normalizeDeck(rows: CardRow[]): CardRow[] {
   const issues: string[] = [];
   const cards = rows.map((row) => {
     const attrs = { ...row.attrs };
     const problem = (text: string) => issues.push(`${row.name}: ${text}`);
     for (const key of ['cost', 'power'] as const) {
+      attrs[key] ??= 0; // an empty cell counts as 0
       const v = attrs[key];
       if (typeof v !== 'number' || !Number.isInteger(v)) problem(`${key === 'cost' ? 'Cost' : 'Power'} must be a whole number`);
     }
