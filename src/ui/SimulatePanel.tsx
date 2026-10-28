@@ -18,9 +18,9 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
   const [rawSetup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<{ summary: Summary; records: GameRecord[]; elapsed: number } | null>(null);
+  const [result, setResult] = useState<{ gameId: string; summary: Summary; records: GameRecord[]; elapsed: number } | null>(null);
   const [saveNote, setSaveNote] = useState('');
-  const [trace, setTrace] = useState<string[] | null>(null);
+  const [trace, setTrace] = useState<{ gameId: string; log: string[] } | null>(null);
   const [error, setError] = useState('');
 
   const entry = games.find((g) => g.game.id === selectedId) ?? games[0];
@@ -28,6 +28,7 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
   const setup = fitSetup(rawSetup, entry.game);
   const game = entry.game;
   const config = configFor(entry, setup);
+  // Results and the sample game stay with the game they were played for; choosing another game at the top hides them.
 
   function changeGame(id: string) {
     onSelect(id);
@@ -48,7 +49,7 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
       validateConfig(game, config);
       const records = await runInWorkers(config, setup.numGames, setProgress);
       const summary = computeStats(game, records, config);
-      setResult({ summary, records, elapsed: (performance.now() - started) / 1000 });
+      setResult({ gameId: game.id, summary, records, elapsed: (performance.now() - started) / 1000 });
       const label = `${game.name}, ${setup.numPlayers} players, ${describeAgents(setup.agents)}`;
       saveRun(makeSavedRun(label, config, summary, records))
         .then(() => {
@@ -67,7 +68,7 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
     setError('');
     try {
       validateConfig(game, config);
-      setTrace(playGame(game, config, Math.floor(Math.random() * 1_000_000), true).log);
+      setTrace({ gameId: game.id, log: playGame(game, config, Math.floor(Math.random() * 1_000_000), true).log });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -77,7 +78,7 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
     <>
       <section className="card">
         <h2>Set up the test</h2>
-        <SetupFields games={games} entry={entry} onSelectGame={changeGame} setup={setup} onChange={setSetup} disabled={running} />
+        <SetupFields games={games} entry={entry} onSelectGame={changeGame} setup={setup} onChange={setSetup} disabled={running} decks />
         <details className="source">
           <summary>View the rules file</summary>
           <pre>{entry.source}</pre>
@@ -94,18 +95,18 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
         {error && <p className="error">{error}</p>}
       </section>
 
-      {trace && (
+      {trace?.gameId === game.id && (
         <section className="card">
           <h2>One sample game</h2>
           <ol className="trace">
-            {trace.map((line, i) => (
+            {trace.log.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
           </ol>
         </section>
       )}
 
-      {result && <Results summary={result.summary} records={result.records} elapsedSeconds={result.elapsed} note={saveNote} />}
+      {result?.gameId === game.id && <Results summary={result.summary} records={result.records} elapsedSeconds={result.elapsed} note={saveNote} />}
     </>
   );
 }
