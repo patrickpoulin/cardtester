@@ -2,6 +2,7 @@ import { loadGame } from '../dsl/compile';
 import type { SimConfig } from '../engine/simulate';
 import type { AnyGame } from '../engine/types';
 import notSnap from './not-snap.yaml?raw';
+import rascallyRaccoons from './rascally-raccoons.yaml?raw';
 
 export interface GameEntry {
   game: AnyGame;
@@ -10,10 +11,11 @@ export interface GameEntry {
   builtin: boolean;
 }
 
-/** The rules every uploaded deck is played with. */
+/** The rules every uploaded deck for each game is played with. */
 export const NOT_SNAP_RULES = notSnap;
+export const RASCALLY_RACCOONS_RULES = rascallyRaccoons;
 
-export const BUILTIN_GAMES: GameEntry[] = [notSnap].map((source) => ({
+export const BUILTIN_GAMES: GameEntry[] = [notSnap, rascallyRaccoons].map((source) => ({
   game: loadGame(source),
   source,
   builtin: true,

@@ -276,7 +276,7 @@ class GameCompiler {
         const a = byId.get(action.type);
         const parts = [a?.label ?? action.type];
         if (action.card) parts.push(action.card);
-        const choices = Object.entries(action.choices ?? {}).map(([k, v]) => `${k}: ${String(v)}`);
+        const choices = Object.entries(action.choices ?? {}).map(([k, v]) => `${k}: ${describeValue(v)}`);
         return parts.join(' ') + (choices.length ? ` (${choices.join(', ')})` : '');
       },
 
@@ -668,6 +668,16 @@ function expandChoices(
   const options = c.options(env);
   if (!Array.isArray(options)) throw new RuleError(`${a.id}: choose.${c.name}.options must be a list`);
   for (const opt of options) expandChoices(a, i + 1, env.child({ [c.name]: opt }), { ...picked, [c.name]: opt }, emit);
+}
+
+/** A chosen player reads as "Player 2" (players are numbered from 1 for people), a card by its name. */
+function describeValue(v: Value): string {
+  if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+    const o = v as Obj;
+    if (typeof o.id === 'number' && typeof o.name === 'string') return o.name;
+    if (typeof o.index === 'number') return `Player ${o.index + 1}`;
+  }
+  return String(v);
 }
 
 function place(ctx: Ctx, dest: Value[], cards: Value[], bottom: boolean): void {

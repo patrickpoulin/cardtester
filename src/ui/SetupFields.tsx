@@ -42,19 +42,21 @@ interface Props {
   setup: RunSetup;
   onChange(setup: RunSetup): void;
   disabled: boolean;
+  /** Pick among the decks of one game (the games list holds one game and its decks) instead of among games. */
+  decks?: boolean;
 }
 
-export function SetupFields({ games, entry, onSelectGame, setup, onChange, disabled }: Props) {
+export function SetupFields({ games, entry, onSelectGame, setup, onChange, disabled, decks }: Props) {
   const { game } = entry;
   return (
     <>
       <div className="form-grid">
         <label>
-          Game
+          {decks ? 'Deck' : 'Game'}
           <select value={game.id} onChange={(e) => onSelectGame(e.target.value)} disabled={disabled}>
             {games.map((g) => (
               <option key={g.game.id} value={g.game.id}>
-                {g.game.name}
+                {decks ? (g.builtin ? 'Original deck' : g.game.name.replace(/^[^:]*:\s*/, '')) : g.game.name}
                 {g.builtin ? '' : ' (yours)'}
               </option>
             ))}

@@ -11,8 +11,8 @@ const starterCards = parseGameYaml(NOT_SNAP_RULES).cards;
 const rows = (csv: string) => cardRows(parseDelimited(csv));
 
 describe('Not Snap decks', () => {
-  it('the site has only Not Snap', () => {
-    expect(BUILTIN_GAMES.map((e) => e.game.id)).toEqual(['not-snap']);
+  it('the site has Not Snap and Rascally Raccoons', () => {
+    expect(BUILTIN_GAMES.map((e) => e.game.id)).toEqual(['not-snap', 'rascally-raccoons']);
   });
 
   it('the starter deck round-trips through the deck template into the same cards', () => {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { loadGame } from '../dsl/compile';
-import { isDeckGame } from '../deck';
+import { formatOf, gamesOfKind } from '../deckFormats';
 import { BUILTIN_GAMES, type GameEntry } from '../games';
 import { deleteGame, listGames, saveGame } from '../report/storage';
 import { ComparePanel } from './ComparePanel';
 import { DeckUpload } from './DeckUpload';
+import { GamePicker } from './GamePicker';
 import { SavedRunsPanel } from './SavedRunsPanel';
 import { SimulatePanel } from './SimulatePanel';
 
@@ -22,12 +23,14 @@ export function App() {
   const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
   const [savedVersion, setSavedVersion] = useState(0);
   const onSaved = () => setSavedVersion((v) => v + 1);
+  // The game chosen at the top of Simulate: a built-in game, whose uploaded decks are shown with it.
+  const format = formatOf(selectedId) ?? formatOf(BUILTIN_GAMES[0].game.id)!;
 
-  // Bring back decks uploaded on earlier visits (games saved before the site became Not Snap-only are skipped).
+  // Bring back decks uploaded on earlier visits (other games saved by older versions of the site are skipped).
   useEffect(() => {
     listGames()
       .then((saved) => {
-        const entries = saved.filter((g) => isDeckGame(g.id)).flatMap((g) => {
+        const entries = saved.filter((g) => formatOf(g.id) !== undefined).flatMap((g) => {
           try {
             return [{ game: loadGame(g.source), source: g.source, builtin: false }];
           } catch {
@@ -48,7 +51,7 @@ export function App() {
 
   function removeGame(id: string) {
     setGames((prev) => prev.filter((g) => g.builtin || g.game.id !== id));
-    if (selectedId === id) setSelectedId(BUILTIN_GAMES[0].game.id);
+    if (selectedId === id) setSelectedId(formatOf(id)?.gameId ?? BUILTIN_GAMES[0].game.id);
     deleteGame(id).catch(() => {});
   }
 
@@ -68,8 +71,9 @@ export function App() {
       </header>
       <main>
         <div hidden={tab !== 'simulate'}>
-          <DeckUpload games={games} onAdd={addGame} onRemove={removeGame} />
-          <SimulatePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+          <GamePicker gameId={format.gameId} onChoose={setSelectedId} />
+          <DeckUpload format={format} decks={gamesOfKind(games, format.gameId).filter((g) => !g.builtin)} onAdd={addGame} onRemove={removeGame} />
+          <SimulatePanel games={gamesOfKind(games, format.gameId)} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
         </div>
         <div hidden={tab !== 'compare'}>
           <ComparePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />

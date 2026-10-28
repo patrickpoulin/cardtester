@@ -1,0 +1,429 @@
+# =============================================================================
+# Rascally Raccoons: be the player holding Percy the Dog when the last
+# Rascally Raccoon is revealed.
+#
+# The rules below are fixed; decks change. Every card plays like one of the
+# cards listed here (its `effect`), so an uploaded deck can change how many
+# copies of each card there are, rename them, or add cards that play like an
+# existing one. The cards here are the designer's card list.
+# =============================================================================
+
+id: rascally-raccoons
+name: Rascally Raccoons
+description: Play as many cards as you like each turn, then draw one. Whoever holds Percy the Dog when the last Rascally Raccoon is revealed wins.
+players: { min: 2, max: 6 }
+scoreLabel: Held Percy at the end
+scoreOrder: higher
+
+timing:
+  setup: 90
+  default: 6
+  actions: { end-turn: 4 }
+
+# How the rules were read where the card list leaves room:
+# - A card that says "End your turn" (and a Rascally Raccoon drawn in the
+#   middle of your turn) ends it without the usual end-of-turn draw. Set
+#   endYourTurnSkipsDraw to false below to draw anyway; Bumper Crop then
+#   draws 4.
+# - "Pass your hand to the left" passes it to the next player clockwise.
+# - Tasty Garbage can't take a Tasty Garbage from the discard pile, since two
+#   of them could otherwise be played back and forth forever.
+# - Percy the Dog can't be played or discarded (Missing Tools skips its
+#   holder), so it always stays in someone's hand.
+# - Missing Tools: each player discards a card of their choice; the bots
+#   discard one at random.
+# - Players can't see each other's hands. The Casual bot only uses what the
+#   table has seen: hands revealed by Spies! and Tripped Up, Percy handed over
+#   by Dog Treats and Barbeque, and who skipped the Missing Tools discard
+#   (kept in percyAt). It forgets when Percy may have moved unseen.
+# - Player 1 goes first.
+
+# -----------------------------------------------------------------------------
+# CARDS: effect says which rule a card follows; text is for people.
+# -----------------------------------------------------------------------------
+cards:
+  - name: Percy the Dog
+    count: 1
+    attrs: { effect: percy, text: "Once all 5 Rascally Raccoon cards have been played; if you are holding this card, you win the game." }
+  - name: Rascally Raccoon
+    count: 5
+    attrs: { effect: raccoon, text: "If you draw this card, immediately place it face up in front of all players. End your Turn." }
+  - name: Tripped Up
+    count: 3
+    attrs: { effect: tripped-up, text: "Reveal your hand to everyone, then draw one card." }
+  - name: Rained out
+    count: 3
+    attrs: { effect: rained-out, text: "Reverse the order of play. End your turn." }
+  - name: Thieves!
+    count: 3
+    attrs: { effect: thieves, text: "Choose another player. Swap hands with that player." }
+  - name: Animal Control
+    count: 3
+    attrs: { effect: animal-control, text: "Take one Raccoon card and shuffle it back in the deck. Shuffle the deck." }
+  - name: Late trash pickup
+    count: 3
+    attrs: { effect: late-trash-pickup, text: "Search the deck for a Rascally Raccoon card, and put it into play. Shuffle the deck. End your Turn." }
+  - name: Raccoon Electric Team
+    count: 3
+    attrs: { effect: electric-team, text: "Skip the turn of the next player. End your turn." }
+  - name: Spies!
+    count: 5
+    attrs: { effect: spies, text: "Choose another player. That player reveals their hand to everyone." }
+  - name: Farmer's Almanac
+    count: 5
+    attrs: { effect: almanac, text: "Look at the top 2 cards of the deck, draw one and put the other on the bottom of the deck." }
+  - name: Dog Treats
+    count: 5
+    attrs: { effect: dog-treats, text: "Choose another player, if they have Percy the Dog, they must give you that card." }
+  - name: Wind Storm
+    count: 3
+    attrs: { effect: wind-storm, text: "All players pass their hand to the left." }
+  - name: Barbeque
+    count: 3
+    attrs: { effect: barbeque, text: "When you play this card, anyone who has the Percy the Dog card must give it to you." }
+  - name: Tasty Garbage
+    count: 3
+    attrs: { effect: tasty-garbage, text: "You may choose one card from the top three cards in the discard pile and add it to your hand" }
+  - name: Midnight Postman
+    count: 10
+    attrs: { effect: postman, text: "Pick another player and steal one of their cards at random." }
+  - name: Fair Trade
+    count: 10
+    attrs: { effect: fair-trade, text: "Choose another player. You both give each other one card at Random." }
+  - name: Bumper Crop
+    count: 10
+    attrs: { effect: bumper-crop, text: "Draw 3 cards, and end your turn." }
+  - name: Missing tools
+    count: 6
+    attrs: { effect: missing-tools, text: "All players, except the player who has Percy the Dog, discards 1 card from their hand." }
+
+zones:
+  shared:
+    deck: { visibility: hidden }
+    discard: { visibility: public }
+    revealed: { visibility: public } # Rascally Raccoons in play
+    aside: { visibility: hidden } # setup only
+    dealPile: { visibility: hidden } # setup only
+  player:
+    hand: { visibility: owner }
+    held: { visibility: hidden } # cards on their way to another hand
+
+vars:
+  shared:
+    endYourTurnSkipsDraw: true # see the notes at the top
+    raccoons: 0 # how many Rascally Raccoons the deck has
+    direction: 1 # 1 = clockwise, -1 after Rained out
+    skipNext: 0 # 1 after Raccoon Electric Team
+    toDraw: 1 # cards to draw at the end of this turn
+    skipDraw: false # this turn ends without the end-of-turn draw
+    stopped: false # a Rascally Raccoon was drawn this turn
+    percyAt: -1 # the player the whole table knows holds Percy, or -1
+
+define:
+  isPercy: "c => c.effect == 'percy'"
+  isRaccoon: "c => c.effect == 'raccoon'"
+  hasPercy: "p => any(p.hand, c => isPercy(c))"
+  mine: "hasPercy(me)"
+  others: "filter(players, p => p.index != current)"
+  onMyRight: "(current - 1 + numPlayers) % numPlayers" # passes their hand to me in a Wind Storm
+  # How much the Casual bot wants a card back from the discard pile.
+  worth: "c => c.effect in ['barbeque', 'thieves', 'dog-treats', 'wind-storm'] ? 3 : 1"
+
+# -----------------------------------------------------------------------------
+# SETUP: set Percy and the Raccoons aside, count out 6 cards per player minus
+# Percy, shuffle Percy in and deal 6 each. The Raccoons are shuffled into the
+# rest of the deck, so nobody starts with one.
+# -----------------------------------------------------------------------------
+setup:
+  - set: { var: raccoons, value: "count(deck, c => isRaccoon(c))" }
+  - move: { cards: "filter(deck, c => isPercy(c) or isRaccoon(c))", to: aside }
+  - shuffle: deck
+  - move: { from: deck, to: dealPile, count: "6 * numPlayers - count(aside, c => isPercy(c))" }
+  - move: { cards: "filter(aside, c => isPercy(c))", to: dealPile }
+  - shuffle: dealPile
+  - deal: { from: dealPile, to: hand, count: 6 }
+  - move: { from: aside, to: deck, all: true }
+  - shuffle: deck
+
+# -----------------------------------------------------------------------------
+# END OF TURN: draw (stopping at a Rascally Raccoon, which goes face up), then
+# play passes on in the current direction, skipping a player after Raccoon
+# Electric Team.
+# -----------------------------------------------------------------------------
+turn:
+  end:
+    - if: "not skipDraw"
+      then:
+        - while: "toDraw > 0 and not stopped and len(deck) > 0"
+          do:
+            - add: { var: toDraw, value: -1 }
+            - if: "isRaccoon(top(deck))"
+              then:
+                - move: { from: deck, to: revealed }
+                - set: { var: stopped, value: true }
+              else:
+                - draw: { from: deck, to: me.hand }
+    - nextPlayer: "(current + direction * (1 + skipNext) + 2 * numPlayers) % numPlayers"
+    - set: { var: skipNext, value: 0 }
+    - set: { var: toDraw, value: 1 }
+    - set: { var: skipDraw, value: false }
+    - set: { var: stopped, value: false }
+
+# -----------------------------------------------------------------------------
+# ACTIONS: play any number of cards, then end the turn. Each played card goes
+# to the discard pile before it takes effect.
+#
+# Casual bot: the holder of Percy wants the Raccoons out and Percy kept quiet;
+# everyone else goes after Percy (Barbeque, then the known holder) and slows
+# the Raccoons down. Cards that end the turn score below the ones that don't,
+# so they're played last.
+# -----------------------------------------------------------------------------
+actions:
+  - id: tripped-up
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'tripped-up'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: percyAt, value: "mine ? current : (percyAt == current ? -1 : percyAt)" }
+      - if: "len(deck) > 0 and isRaccoon(top(deck))"
+        then:
+          - move: { from: deck, to: revealed }
+          - set: { var: skipDraw, value: endYourTurnSkipsDraw }
+          - endTurn: true
+        else:
+          - draw: { from: deck, to: me.hand }
+    score: "mine ? -5 : 2"
+
+  - id: rained-out
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'rained-out'" }
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: direction, value: -direction }
+      - set: { var: skipDraw, value: endYourTurnSkipsDraw }
+    score: "mine ? -1 : 1"
+
+  - id: thieves
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'thieves'" }
+    choose:
+      target: { options: others }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - move: { from: me.hand, to: me.held, all: true }
+      - move: { from: target.hand, to: me.hand, all: true }
+      - move: { from: me.held, to: target.hand, all: true }
+      - if: "percyAt == current"
+        then:
+          - set: { var: percyAt, value: target.index }
+        else:
+          - if: "percyAt == target.index"
+            then:
+              - set: { var: percyAt, value: current }
+    score: >-
+      mine ? -50 : (percyAt >= 0 ? (target.index == percyAt ? 50 : -5) : (len(target.hand) > len(me.hand) ? 2 : -2))
+
+  - id: animal-control
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'animal-control'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - if: "len(revealed) > 0"
+        then:
+          - move: { from: revealed, to: deck }
+          - shuffle: deck
+    score: "len(revealed) == 0 ? -5 : (mine ? -20 : 8)"
+
+  - id: late-trash-pickup
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'late-trash-pickup'" }
+    effects:
+      - move: { card: card, to: discard }
+      - if: "any(deck, c => isRaccoon(c))"
+        then:
+          - move: { card: "top(filter(deck, c => isRaccoon(c)))", to: revealed }
+      - shuffle: deck
+      - set: { var: skipDraw, value: endYourTurnSkipsDraw }
+    score: "mine ? 9 : -20"
+
+  - id: electric-team
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'electric-team'" }
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: skipNext, value: 1 }
+      - set: { var: skipDraw, value: endYourTurnSkipsDraw }
+    score: "mine ? -1 : 1"
+
+  - id: spies
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'spies'" }
+    choose:
+      target: { options: others }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: percyAt, value: "hasPercy(target) ? target.index : (percyAt == target.index ? -1 : percyAt)" }
+    score: "not mine and percyAt < 0 ? 4 : -1"
+
+  - id: almanac
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'almanac'" }
+    choose:
+      pick: { options: "range(min(2, len(deck)))" } # 0 = the top card, 1 = the one under it
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - if: "isRaccoon(deck[-1 - pick])"
+        then:
+          - move: { card: "deck[-1 - pick]", to: revealed }
+          - set: { var: skipDraw, value: endYourTurnSkipsDraw }
+          - endTurn: true
+        else:
+          - move: { card: "deck[-1 - pick]", to: me.hand }
+          - if: "len(deck) > 0"
+            then:
+              - move: { from: deck, to: deck, position: bottom }
+    # Not holding Percy: keep the Raccoons in the deck (sending one to the bottom is best); holding it: draw them.
+    score: >-
+      isRaccoon(deck[-1 - pick])
+        ? (mine ? 15 : -8)
+        : (mine ? 4 : 2 + (any(range(min(2, len(deck))), i => isRaccoon(deck[-1 - i])) ? 6 : 0))
+
+  - id: dog-treats
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'dog-treats'" }
+    choose:
+      target: { options: others }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - if: "hasPercy(target)"
+        then:
+          - move: { cards: "filter(target.hand, c => isPercy(c))", to: me.hand }
+          - set: { var: percyAt, value: current }
+        else:
+          - if: "percyAt == target.index"
+            then:
+              - set: { var: percyAt, value: -1 }
+    score: "mine ? -10 : (percyAt >= 0 ? (target.index == percyAt ? 45 : -5) : 3)"
+
+  - id: wind-storm
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'wind-storm'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - forEach:
+          in: players
+          as: p
+          do:
+            - move: { from: p.hand, to: p.held, all: true }
+      - forEach:
+          in: players
+          as: p
+          do:
+            - move: { from: p.held, to: "players[(p.index + 1) % numPlayers].hand", all: true }
+      - if: "percyAt >= 0"
+        then:
+          - set: { var: percyAt, value: "(percyAt + 1) % numPlayers" }
+    score: "mine ? -40 : (percyAt == onMyRight ? 40 : -1)"
+
+  - id: barbeque
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'barbeque'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - forEach:
+          in: others
+          as: p
+          do:
+            - move: { cards: "filter(p.hand, c => isPercy(c))", to: me.hand }
+      - set: { var: percyAt, value: current }
+    score: "mine ? -10 : 60"
+
+  - id: tasty-garbage
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'tasty-garbage'" }
+    choose:
+      # 0 = the top card of the discard pile. Taking back a Tasty Garbage isn't allowed: two of them could be played forever.
+      pick: { options: "filter(range(min(3, len(discard))), i => discard[-1 - i].effect != 'tasty-garbage')" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - move: { card: "discard[-2 - pick]", to: me.hand } # Tasty Garbage itself is now on top
+    score: "1 + worth(discard[-1 - pick])"
+
+  - id: postman
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'postman'" }
+    choose:
+      target: { options: others }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - shuffle: target.hand
+      - move: { from: target.hand, to: me.hand }
+      - if: "percyAt == target.index or percyAt == current"
+        then:
+          - set: { var: percyAt, value: -1 }
+    score: "mine ? 12 : (percyAt >= 0 ? (target.index == percyAt ? 20 : 2) : 4)"
+
+  - id: fair-trade
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'fair-trade'" }
+    choose:
+      target: { options: others }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - shuffle: me.hand
+      - move: { from: me.hand, to: me.held }
+      - shuffle: target.hand
+      - move: { from: target.hand, to: me.hand }
+      - move: { from: me.held, to: target.hand, all: true }
+      - if: "percyAt == target.index or percyAt == current"
+        then:
+          - set: { var: percyAt, value: -1 }
+    score: "mine ? -15 : (percyAt >= 0 ? (target.index == percyAt ? 15 : -1) : 2)"
+
+  - id: bumper-crop
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'bumper-crop'" }
+    effects:
+      - move: { card: card, to: discard }
+      - set: { var: toDraw, value: "endYourTurnSkipsDraw ? 3 : 4" }
+    score: "mine ? 8 : -1"
+
+  - id: missing-tools
+    label: plays
+    card: { from: me.hand, where: "card.effect == 'missing-tools'" }
+    endsTurn: false
+    effects:
+      - move: { card: card, to: discard }
+      - forEach:
+          in: "filter(players, p => not hasPercy(p))"
+          as: p
+          do:
+            - shuffle: p.hand
+            - move: { from: p.hand, to: discard }
+      # Whoever didn't discard holds Percy.
+      - set: { var: percyAt, value: "top(map(filter(players, p => hasPercy(p)), p => p.index)) ?? -1" }
+    score: "mine ? -5 : (percyAt < 0 ? 6 : 1)"
+
+  - id: end-turn
+    label: ends their turn
+    score: 0
+
+# -----------------------------------------------------------------------------
+# ENDING AND WINNING: once every Rascally Raccoon is face up, whoever holds
+# Percy the Dog wins.
+# -----------------------------------------------------------------------------
+endWhen: "len(revealed) >= raccoons"
+winners: "filter(players, p => hasPercy(p))"
+score: "hasPercy(p) ? 1 : 0"
+progress: "hasPercy(p) ? 1 : 0"

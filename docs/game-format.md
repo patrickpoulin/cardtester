@@ -1,7 +1,7 @@
 # The game.yaml format
 
 A game file describes a card game's components and rules so Card Tester can play it. [`src/games/not-snap.yaml`](../src/games/not-snap.yaml)
-(the site's game) and the engine's test games in [`tests/fixtures/games/`](../tests/fixtures/games)
+and [`src/games/rascally-raccoons.yaml`](../src/games/rascally-raccoons.yaml) (the site's games) and the engine's test games in [`tests/fixtures/games/`](../tests/fixtures/games)
 are complete examples:
 
 - [`crazy-eights.yaml`](../tests/fixtures/games/crazy-eights.yaml): shedding game, choices (naming a suit), drawing with reshuffles
