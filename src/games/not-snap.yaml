@@ -85,12 +85,20 @@ zones:
 vars:
   shared:
     snapTurn: 1 # the game turn (1-6); both players act once per turn
+    # Settings: the numbers a Settings tab in a Google Sheet can change.
+    openingHand: 3 # cards each player draws at the start
+    turns: 6 # turns in a game; locations are scored after the last one
+    handLimit: 7 # no draws beyond this many cards in hand
+    drawPerTurn: 1 # cards drawn at the start of each turn
+    cardsPerLocation: 4 # most cards one player can have at a location
+    forgeBonus: 1 # power added to a card played at the Forge
+    bogPenalty: 1 # power taken from each card in the Bog
   player:
     energy: 0 # refilled to the turn number at the start of each turn
 
 # -----------------------------------------------------------------------------
 # DEFINE
-# Locations: 1 = Plains (no effect), 2 = Forge (cards played here get +1
+# Locations (default settings): 1 = Plains (no effect), 2 = Forge (cards played here get +1
 # power), 3 = Bog (Ongoing: cards here have -1 power).
 # -----------------------------------------------------------------------------
 define:
@@ -99,13 +107,13 @@ define:
   lanePower: >-
     (p, l) => sum(laneOf(p, l), c => c.power)
       + sum(laneOf(p, l), c => c.effect == 'ongoing-boost' ? c.amount * (len(laneOf(p, l)) - 1) : 0)
-      - (l == 3 ? len(laneOf(p, l)) : 0)
+      - (l == 3 ? bogPenalty * len(laneOf(p, l)) : 0)
   locationsWon: "p => count([1, 2, 3], l => lanePower(p, l) > lanePower(opponent(p), l))"
   totalPower: "p => lanePower(p, 1) + lanePower(p, 2) + lanePower(p, 3)"
-  openLanes: "filter([1, 2, 3], l => len(laneOf(me, l)) < 4)" # 4 cards per side, max
+  openLanes: "filter([1, 2, 3], l => len(laneOf(me, l)) < cardsPerLocation)"
 
 # -----------------------------------------------------------------------------
-# SETUP AND TURNS: each player shuffles and draws 3. At the start of every turn
+# SETUP AND TURNS (numbers are the default settings): each player shuffles and draws 3. At the start of every turn
 # the player draws a card (hand limit 7) and gets energy equal to the turn.
 # -----------------------------------------------------------------------------
 setup:
@@ -114,13 +122,13 @@ setup:
       as: p
       do:
         - shuffle: p.deck
-        - draw: { from: p.deck, to: p.hand, count: 3 }
+        - draw: { from: p.deck, to: p.hand, count: openingHand }
 
 turn:
   start:
-    - if: "len(me.hand) < 7"
+    - if: "len(me.hand) < handLimit"
       then:
-        - draw: { from: me.deck, to: me.hand }
+        - draw: { from: me.deck, to: me.hand, count: "min(drawPerTurn, handLimit - len(me.hand))" }
     - set: { var: me.energy, value: snapTurn }
 
 # -----------------------------------------------------------------------------
@@ -138,11 +146,11 @@ actions:
       - add: { var: me.energy, value: -card.cost }
       - if: "lane == 2" # Forge
         then:
-          - add: { var: card.power, value: 1 }
+          - add: { var: card.power, value: forgeBonus }
       # On Reveal abilities
       - if: "card.effect == 'draw'"
         then:
-          - draw: { from: me.deck, to: me.hand, count: "max(0, min(card.amount, 7 - len(me.hand)))" }
+          - draw: { from: me.deck, to: me.hand, count: "max(0, min(card.amount, handLimit - len(me.hand)))" }
       - if: "card.effect == 'boost-here'"
         then:
           - forEach:
@@ -178,10 +186,10 @@ actions:
     score: 0
 
 # -----------------------------------------------------------------------------
-# ENDING AND WINNING: after turn 6, whoever wins more locations wins. A tie on
+# ENDING AND WINNING: after the last turn (6 by default), whoever wins more locations wins. A tie on
 # locations goes to total power; a full tie is a shared win.
 # -----------------------------------------------------------------------------
-endWhen: "snapTurn > 6"
+endWhen: "snapTurn > turns"
 winners: "highest(players, p => locationsWon(p) * 1000 + totalPower(p))"
 score: "locationsWon(p)"
 progress: "locationsWon(p) * 1000 + totalPower(p)" # who is ahead mid-game

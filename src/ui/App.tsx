@@ -7,6 +7,7 @@ import { ComparePanel } from './ComparePanel';
 import { DeckUpload } from './DeckUpload';
 import { GamePicker } from './GamePicker';
 import { SavedRunsPanel } from './SavedRunsPanel';
+import { SheetSource } from './SheetSource';
 import { SimulatePanel } from './SimulatePanel';
 
 const TABS = [
@@ -49,6 +50,17 @@ export function App() {
     saveGame(entry.game.id, entry.source).catch(() => {});
   }
 
+  // Decks from a game's Google Sheet replace the ones it gave before; they aren't saved in the browser, since the sheet is read on every visit.
+  function setSheetGames(gameId: string, entries: GameEntry[], choose: boolean) {
+    setGames((prev) => [
+      ...prev.filter((g) => !(g.fromSheet && formatOf(g.game.id)?.gameId === gameId) && !entries.some((e) => e.game.id === g.game.id)),
+      ...entries,
+    ]);
+    if (choose && entries.length) setSelectedId(entries[0].game.id);
+    else setSelectedId((id) => (id === gameId || entries.some((e) => e.game.id === id) || !isSheetDeck(id) ? id : gameId));
+  }
+  const isSheetDeck = (id: string) => games.some((g) => g.fromSheet && g.game.id === id);
+
   function removeGame(id: string) {
     setGames((prev) => prev.filter((g) => g.builtin || g.game.id !== id));
     if (selectedId === id) setSelectedId(formatOf(id)?.gameId ?? BUILTIN_GAMES[0].game.id);
@@ -72,7 +84,8 @@ export function App() {
       <main>
         <div hidden={tab !== 'simulate'}>
           <GamePicker gameId={format.gameId} onChoose={setSelectedId} />
-          <DeckUpload format={format} decks={gamesOfKind(games, format.gameId).filter((g) => !g.builtin)} onAdd={addGame} onRemove={removeGame} />
+          <SheetSource format={format} onLoad={setSheetGames} />
+          <DeckUpload format={format} decks={gamesOfKind(games, format.gameId).filter((g) => !g.builtin && !g.fromSheet)} onAdd={addGame} onRemove={removeGame} />
           <SimulatePanel games={gamesOfKind(games, format.gameId)} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
         </div>
         <div hidden={tab !== 'compare'}>
