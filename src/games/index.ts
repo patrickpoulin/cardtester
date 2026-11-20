@@ -9,6 +9,8 @@ export interface GameEntry {
   /** The game.yaml text the game was compiled from. */
   source: string;
   builtin: boolean;
+  /** Loaded from a Google Sheet: shown with the game but not saved in the browser. */
+  fromSheet?: boolean;
 }
 
 /** The rules every uploaded deck for each game is played with. */

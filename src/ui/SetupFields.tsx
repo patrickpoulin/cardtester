@@ -57,7 +57,7 @@ export function SetupFields({ games, entry, onSelectGame, setup, onChange, disab
             {games.map((g) => (
               <option key={g.game.id} value={g.game.id}>
                 {decks ? (g.builtin ? 'Original deck' : g.game.name.replace(/^[^:]*:\s*/, '')) : g.game.name}
-                {g.builtin ? '' : ' (yours)'}
+                {g.builtin || g.fromSheet ? '' : ' (yours)'}
               </option>
             ))}
           </select>

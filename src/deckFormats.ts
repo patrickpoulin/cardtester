@@ -16,8 +16,10 @@ export interface DeckFormat {
   /** Excel template in public/templates/. */
   template: string;
   effects: DeckEffect[];
-  /** Checks the rows and builds the game they make with the fixed rules. Throws DeckError. */
-  deckGame(rows: CardRow[], deckName: string): GameEntry;
+  /** The game's rules file, which every deck is played with. */
+  rules: string;
+  /** Checks the rows and builds the game they make with the game's rules (or `rules`, such as the rules with a sheet's settings). Throws DeckError. */
+  deckGame(rows: CardRow[], deckName: string, rules?: string): GameEntry;
   /** A game of this kind (the built-in one or a deck) as CSV in the template's columns. */
   deckCsv(source: string): string;
   isDeck(id: string): boolean;
@@ -29,7 +31,8 @@ export const DECK_FORMATS: DeckFormat[] = [
     columns: ['Name', 'Per Player', 'Cost', 'Power', 'Effect', 'Amount', 'Ability'],
     template: 'deck-template.xlsx',
     effects: EFFECTS,
-    deckGame: (rows, name) => deckGame(NOT_SNAP_RULES, rows, name),
+    rules: NOT_SNAP_RULES,
+    deckGame: (rows, name, rules = NOT_SNAP_RULES) => deckGame(rules, rows, name),
     deckCsv,
     isDeck: isDeckGame,
   },
@@ -38,7 +41,8 @@ export const DECK_FORMATS: DeckFormat[] = [
     columns: RACCOON_COLUMNS,
     template: 'rascally-raccoons-deck-template.xlsx',
     effects: raccoonEffects(RASCALLY_RACCOONS_RULES),
-    deckGame: (rows, name) => raccoonDeckGame(RASCALLY_RACCOONS_RULES, rows, name),
+    rules: RASCALLY_RACCOONS_RULES,
+    deckGame: (rows, name, rules = RASCALLY_RACCOONS_RULES) => raccoonDeckGame(rules, rows, name),
     deckCsv: (source) => raccoonDeckCsv(RASCALLY_RACCOONS_RULES, source),
     isDeck: isRaccoonDeck,
   },
