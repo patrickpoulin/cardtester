@@ -20,7 +20,7 @@ and tested here.
    played. **Watch one game** steps through a single game move by move. Download it as a spreadsheet
    (summary or one row per game).
 
-Change the sheet, click **Reload from sheet**, and run again. Every run is kept under **Saved runs**,
+Change the sheet, click **Load sheet** again, and run again. Every run is kept under **Saved runs**,
 and **Compare** puts any two of them side by side and says which differences are real and which
 could just be luck.
 

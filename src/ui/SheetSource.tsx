@@ -116,7 +116,7 @@ export function SheetSource({ onLoad }: Props) {
       <p className="muted">
         The game, its settings and its decks all come from a Google Sheet, so you change cards and rules there and test them here. Start from
         an example: make your own copy, share your copy as "Anyone with the link can view", and paste its link below. The site reads the
-        sheet each time it opens; click Reload from sheet after you change it.
+        sheet each time it opens; click Load sheet again after you change it.
       </p>
       <table className="effects examples">
         <tbody>
@@ -184,7 +184,7 @@ export function SheetSource({ onLoad }: Props) {
       </label>
       <div className="actions tight">
         <button className="primary" onClick={() => load(link, true)} disabled={loading || !link.trim()}>
-          {loading ? 'Reading the sheet…' : status ? 'Reload from sheet' : 'Load sheet'}
+          {loading ? 'Reading the sheet…' : 'Load sheet'}
         </button>
         {link && (
           <button className="link" onClick={forget} disabled={loading}>
