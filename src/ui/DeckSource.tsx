@@ -1,34 +1,22 @@
 import { useMemo } from 'react';
 import { parseGameYaml } from '../dsl/compile';
+import { formatOf } from '../deckFormats';
 import type { GameEntry } from '../games';
-
-export type DeckOrigin = 'builtin' | 'sheet' | 'uploaded';
-
-export const originOf = (g: GameEntry): DeckOrigin => (g.builtin ? 'builtin' : g.fromSheet ? 'sheet' : 'uploaded');
-
-export const ORIGIN_LABELS: Record<DeckOrigin, string> = {
-  builtin: 'Built into the site',
-  sheet: 'From your Google Sheet',
-  uploaded: 'Uploaded in this browser',
-};
 
 /** The deck's own name, without the game's name or the "(sheet)" marker. */
 export function deckLabel(g: GameEntry): string {
-  if (g.builtin) return 'Original deck';
   return g.game.name.replace(/^[^:]*:\s*/, '').replace(/\s*\(sheet\)$/, '');
 }
 
 interface Props {
   entry: GameEntry;
-  /** The game's built-in entry, for the default settings. */
-  builtin: GameEntry;
 }
 
 const time = (ms: number) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
-/** Says where the chosen deck comes from, which settings it plays with, and lists its cards. */
-export function DeckSource({ entry, builtin }: Props) {
-  const origin = originOf(entry);
+/** Says which sheet tab the chosen deck comes from, which settings it plays with, and lists its cards. */
+export function DeckSource({ entry }: Props) {
+  const rules = formatOf(entry.game.id)?.rules ?? entry.source;
   const cards = useMemo(() => {
     try {
       return parseGameYaml(entry.source).cards.flatMap((c) => {
@@ -43,11 +31,11 @@ export function DeckSource({ entry, builtin }: Props) {
   }, [entry.source]);
   const defaults = useMemo(() => {
     try {
-      return parseGameYaml(builtin.source).vars.shared as Record<string, unknown>;
+      return parseGameYaml(rules).vars.shared as Record<string, unknown>;
     } catch {
       return {};
     }
-  }, [builtin.source]);
+  }, [rules]);
   const perPlayer = useMemo(() => {
     try {
       return parseGameYaml(entry.source).cards.some((c) => 'perPlayer' in c);
@@ -59,24 +47,16 @@ export function DeckSource({ entry, builtin }: Props) {
   const total = cards.reduce((n, c) => n + (Number(c.copies) || 0), 0);
   const changed = Object.entries(entry.sheet?.settings ?? {});
 
-  let where: string;
-  if (origin === 'builtin') where = "The deck that comes with the site, played with the default settings. Editing the Google Sheet doesn't change it.";
-  else if (origin === 'sheet')
-    where = `Read from the "${entry.sheet?.tab ?? ''}" tab of your Google Sheet${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. Click Reload from sheet above after editing it.`;
-  else where = 'A deck you uploaded or pasted, kept in this browser and played with the default settings.';
+  const where = `Read from the "${entry.sheet?.tab ?? ''}" tab of your Google Sheet${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. Click Reload from sheet above after editing it.`;
 
   return (
-    <div className={`deck-source deck-source-${origin}`}>
-      <p>
-        <span className="deck-badge">{ORIGIN_LABELS[origin]}</span> {where}
+    <div className="deck-source">
+      <p>{where}</p>
+      <p className="small">
+        {changed.length
+          ? `Settings from the sheet: ${changed.map(([k, v]) => `${k} ${String(v)} (default ${String(defaults[k])})`).join(', ')}. Everything else is the default.`
+          : 'Settings: the sheet uses the default values.'}
       </p>
-      {origin === 'sheet' && (
-        <p className="small">
-          {changed.length
-            ? `Settings from the sheet: ${changed.map(([k, v]) => `${k} ${String(v)} (default ${String(defaults[k])})`).join(', ')}. Everything else is the default.`
-            : 'Settings: the sheet uses the default values.'}
-        </p>
-      )}
       <details className="source">
         <summary>
           {cards.length} {cards.length === 1 ? 'card' : 'cards'}

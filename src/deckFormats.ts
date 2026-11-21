@@ -18,6 +18,10 @@ export interface DeckFormat {
   effects: DeckEffect[];
   /** The game's rules file, which every deck is played with. */
   rules: string;
+  /** The rules' vars.shared values a sheet's Settings tab may change. */
+  settings: string[];
+  /** A read-only Google Sheet with this game's original deck, for people to copy. */
+  exampleSheet: string;
   /** Checks the rows and builds the game they make with the game's rules (or `rules`, such as the rules with a sheet's settings). Throws DeckError. */
   deckGame(rows: CardRow[], deckName: string, rules?: string): GameEntry;
   /** A game of this kind (the built-in one or a deck) as CSV in the template's columns. */
@@ -32,6 +36,8 @@ export const DECK_FORMATS: DeckFormat[] = [
     template: 'deck-template.xlsx',
     effects: EFFECTS,
     rules: NOT_SNAP_RULES,
+    settings: ['openingHand', 'turns', 'handLimit', 'drawPerTurn', 'cardsPerLocation', 'forgeBonus', 'bogPenalty'],
+    exampleSheet: '18MKJkmbiJXNpaWK75qcFVc-S_7cUKb3oKUIr3plwUuQ',
     deckGame: (rows, name, rules = NOT_SNAP_RULES) => deckGame(rules, rows, name),
     deckCsv,
     isDeck: isDeckGame,
@@ -42,6 +48,8 @@ export const DECK_FORMATS: DeckFormat[] = [
     template: 'rascally-raccoons-deck-template.xlsx',
     effects: raccoonEffects(RASCALLY_RACCOONS_RULES),
     rules: RASCALLY_RACCOONS_RULES,
+    settings: ['endYourTurnSkipsDraw'],
+    exampleSheet: '1ZEg5t5cTxueYxp50WYw0vDEU6uOupPD1n-r6cPwJ2NE',
     deckGame: (rows, name, rules = RASCALLY_RACCOONS_RULES) => raccoonDeckGame(rules, rows, name),
     deckCsv: (source) => raccoonDeckCsv(RASCALLY_RACCOONS_RULES, source),
     isDeck: isRaccoonDeck,

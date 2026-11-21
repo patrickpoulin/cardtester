@@ -12,8 +12,8 @@ import type { GameEntry } from './games';
  * query endpoint, so no API key or sign-in is needed. The tabs:
  *
  * - Decks: Deck name, Tab (the tab holding its cards). One row per deck.
- * - Settings (optional): Setting, Value. Each setting must be one the game's rules file declares
- *   under vars.shared; it replaces that value for every deck in the sheet.
+ * - Settings (optional): Setting, Value. Each setting must be one the game allows (DeckFormat.settings,
+ *   values under vars.shared in its rules file); it replaces that value for every deck in the sheet.
  * - One tab per deck, in the same columns as the game's deck template.
  *
  * Other tabs (Effects, Rules) are for people and are not read.
@@ -92,13 +92,15 @@ function isOtherTab(csv: string, wanted: string): boolean {
   const looksLikeSettings = col(h, 'setting') >= 0 && col(h, 'value') >= 0;
   if (wanted === DECKS_TAB) return !looksLikeDecks;
   if (wanted === SETTINGS_TAB) return !looksLikeSettings;
-  return looksLikeDecks || looksLikeSettings;
+  // A deck tab names its cards in a Name (or Card Name …) column.
+  return looksLikeDecks || looksLikeSettings || col(h, 'name', 'card name', 'card', 'unique id', 'id') < 0;
 }
 
 /** The rules with the Settings tab's values in place of their defaults. */
 export function applySettings(
   rules: string,
   settingsCsv: string | undefined,
+  allowed?: string[],
 ): { rules: string; issues: string[]; notes: string[]; changed: Record<string, number | boolean> } {
   const issues: string[] = [];
   const notes: string[] = [];
@@ -117,7 +119,7 @@ export function applySettings(
     const name = (r[nameCol] ?? '').trim();
     const raw = (r[valueCol] ?? '').trim();
     if (!name) return;
-    if (!(name in defaults)) {
+    if (!(name in defaults) || (allowed && !allowed.includes(name))) {
       unused.push(name);
       return;
     }
@@ -136,7 +138,8 @@ export function applySettings(
     shared.set(name, value);
     if (value !== current) changed[name] = value;
   });
-  if (unused.length) notes.push(`Not used, since the rules have no setting by that name: ${unused.join(', ')}.`);
+  if (unused.length)
+    notes.push(`Not used, since the game has no setting by that name: ${unused.join(', ')}.${allowed ? ` The settings are ${allowed.join(', ')}.` : ''}`);
   return { rules: doc.toString({ lineWidth: 0 }), issues, notes, changed };
 }
 
@@ -152,7 +155,7 @@ export interface SheetGames {
 export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: number): SheetGames {
   const decksCsv = tabs[DECKS_TAB];
   if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) throw new SheetError(`The sheet needs a tab named "${DECKS_TAB}" with Deck name and Tab columns`);
-  const settings = applySettings(format.rules, tabs[SETTINGS_TAB]);
+  const settings = applySettings(format.rules, tabs[SETTINGS_TAB], format.settings);
   const issues = [...settings.issues];
   const games: GameEntry[] = [];
   const decks = deckList(decksCsv);

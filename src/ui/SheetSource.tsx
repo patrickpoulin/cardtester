@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DeckFormat } from '../deckFormats';
+import { builtinGame, type DeckFormat } from '../deckFormats';
 import type { GameEntry } from '../games';
 import { fetchSheetTabs, savedSheet, saveSheet, sheetGames, sheetIdFromLink, type SheetTabs } from '../sheet';
 
@@ -31,6 +31,7 @@ function linkFromAddress(gameId: string, firstGameId: string): string | null {
 
 export function SheetSource({ format, onLoad }: Props) {
   const gameId = format.gameId;
+  const gameName = builtinGame(gameId).game.name + ' deck';
   const [link, setLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
@@ -43,7 +44,7 @@ export function SheetSource({ format, onLoad }: Props) {
     const decks = (result.games.length === 1 ? '1 deck' : `${result.games.length} decks`) + (names ? ` (${names})` : '');
     setStatus({
       kind: cached ? 'cached' : result.games.length ? 'ok' : 'error',
-      text: cached ? `${cached} Using the copy from ${time(fetchedAt)}: ${decks}.` : `Loaded ${decks} from the sheet at ${time(fetchedAt)}. Choose them under "From your Google Sheet" in the Deck list below.`,
+      text: cached ? `${cached} Using the copy from ${time(fetchedAt)}: ${decks}.` : `Loaded ${decks} from the sheet at ${time(fetchedAt)}. Choose one in the Deck list below.`,
       issues: result.issues,
       notes: result.notes,
     });
@@ -100,11 +101,33 @@ export function SheetSource({ format, onLoad }: Props) {
 
   return (
     <section className="card">
-      <h2>Google Sheet</h2>
+      <h2>Your Google Sheet</h2>
       <p className="muted">
-        Keep your decks and settings in a Google Sheet and edit them there. Share the sheet as "Anyone with the link can view" and paste its
-        link here. The site reads the sheet each time it opens; click Reload after you change it. The sheet needs a Decks tab (Deck name, Tab),
-        one tab per deck in the deck template's columns, and optionally a Settings tab (Setting, Value).
+        {gameName}s and settings come from a Google Sheet, so you change cards and rules there and test them here. Start from the
+        example: make your own copy, share your copy as "Anyone with the link can view", and paste its link below. The site reads the sheet
+        each time it opens; click Reload from sheet after you change it.
+      </p>
+      <div className="actions tight">
+        <a className="button" href={`https://docs.google.com/spreadsheets/d/${format.exampleSheet}/copy`} target="_blank" rel="noreferrer">
+          Make a copy of the example sheet
+        </a>
+        <a className="button" href={`https://docs.google.com/spreadsheets/d/${format.exampleSheet}/edit?usp=sharing`} target="_blank" rel="noreferrer">
+          View the example (read-only)
+        </a>
+        <button
+          onClick={() => {
+            const example = `https://docs.google.com/spreadsheets/d/${format.exampleSheet}/edit`;
+            setLink(example);
+            load(example, true);
+          }}
+          disabled={loading}
+        >
+          Try it with the example
+        </button>
+      </div>
+      <p className="muted small">
+        The sheet needs a Decks tab (Deck name, Tab), one tab per deck in this game's card columns ({format.columns.join(', ')}), and
+        optionally a Settings tab (Setting, Value) with any of: {format.settings.join(', ')}.
       </p>
       <label className="stack">
         Sheet link
