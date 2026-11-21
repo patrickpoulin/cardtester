@@ -50,7 +50,9 @@ export function SimulatePanel({ games, selectedId, onSelect, onSaved }: Props) {
       const records = await runInWorkers(config, setup.numGames, setProgress);
       const summary = computeStats(game, records, config);
       setResult({ gameId: game.id, summary, records, elapsed: (performance.now() - started) / 1000 });
-      const label = `${game.name}, ${setup.numPlayers} players, ${describeAgents(setup.agents)}`;
+      // The settings the sheet changed tell runs of the same deck apart.
+      const changed = Object.entries(entry.sheet?.settings ?? {}).map(([k, v]) => `${k} ${String(v)}`);
+      const label = `${game.name}${changed.length ? ` [${changed.join(', ')}]` : ''}, ${setup.numPlayers} players, ${describeAgents(setup.agents)}`;
       saveRun(makeSavedRun(label, config, summary, records))
         .then(() => {
           setSaveNote('Saved under Saved runs.');

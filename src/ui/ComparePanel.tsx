@@ -1,139 +1,79 @@
-import { useMemo, useState } from 'react';
-import { GameDefinitionError, loadGame } from '../dsl/compile';
-import { smokeTest } from '../dsl/smoke';
-import { validateConfig, type SimConfig } from '../engine/simulate';
-import { computeStats } from '../engine/stats';
-import type { GameEntry } from '../games';
-import { compareSummaries, type CompareRow } from '../report/compare';
-import { diffLines, type Change } from '../report/diff';
-import { makeSavedRun, saveRun } from '../report/storage';
-import { runInWorkers } from '../runner';
-import { ChangeList, ComparisonView } from './ComparisonView';
-import { DEFAULT_SETUP, ProgressBar, SetupFields, configFor, describeAgents, fitSetup, type RunSetup } from './SetupFields';
+import { useEffect, useState } from 'react';
+import { formatOf } from '../deckFormats';
+import { compareSummaries } from '../report/compare';
+import { listRuns, type SavedRun } from '../report/storage';
+import { ComparisonView } from './ComparisonView';
 
 interface Props {
-  games: GameEntry[];
-  selectedId: string;
-  onSelect(id: string): void;
-  onSaved(): void;
+  /** Changes whenever a run is saved, so the list reloads. */
+  version: number;
 }
 
-export function ComparePanel({ games, selectedId, onSelect, onSaved }: Props) {
-  const entry = games.find((g) => g.game.id === selectedId) ?? games[0];
-  const [rawSetup, setSetup] = useState<RunSetup>(DEFAULT_SETUP);
-  // The game can also be selected from another page, so the player count is fitted to it here.
-  const setup = fitSetup(rawSetup, entry.game);
-  const [variant, setVariant] = useState(entry.source);
-  const [variantOf, setVariantOf] = useState(entry.game.id);
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [issues, setIssues] = useState<string[]>([]);
-  const [result, setResult] = useState<{ rows: CompareRow[]; changes: Change[] } | null>(null);
+const when = (at: string | number) => new Date(at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' });
+const runLabel = (r: SavedRun) => `${when(r.createdAt)}: ${r.label} (${r.summary.games.toLocaleString()} games)`;
 
-  // Start the variant from the selected game's file whenever the game changes.
-  if (variantOf !== entry.game.id) {
-    setVariantOf(entry.game.id);
-    setVariant(entry.source);
-    setResult(null);
-  }
+/** Compares two saved runs, such as the same deck before and after a change to the sheet. */
+export function ComparePanel({ version }: Props) {
+  const [runs, setRuns] = useState<SavedRun[] | null>(null);
+  const [error, setError] = useState('');
+  const [a, setA] = useState<number | ''>('');
+  const [b, setB] = useState<number | ''>('');
+  const [shown, setShown] = useState<[number, number] | null>(null);
 
-  const changes = useMemo(() => diffLines(entry.source, variant), [entry.source, variant]);
+  useEffect(() => {
+    listRuns()
+      .then((r) => {
+        setRuns(r);
+        setError('');
+      })
+      .catch(() => setError("This browser can't store saved runs (private window or blocked site data)."));
+  }, [version]);
 
-  function changeGame(id: string) {
-    onSelect(id);
-    setSetup(fitSetup(setup, games.find((g) => g.game.id === id)!.game));
-  }
+  const byId = (id: number | '') => runs?.find((r) => r.id === id);
+  const runA = shown && byId(shown[0]);
+  const runB = shown && byId(shown[1]);
+  const different = runA && runB && (runA.summary.numPlayers !== runB.summary.numPlayers || formatOf(runA.summary.gameId)?.gameId !== formatOf(runB.summary.gameId)?.gameId);
 
-  async function run() {
-    setIssues([]);
-    setResult(null);
-    let variantGame;
-    try {
-      variantGame = loadGame(variant);
-    } catch (err) {
-      setIssues(err instanceof GameDefinitionError ? err.issues : [err instanceof Error ? err.message : String(err)]);
-      return;
-    }
-    const problems = smokeTest(variantGame);
-    if (problems.length) return setIssues(problems);
-
-    const configA = configFor(entry, setup);
-    const configB: SimConfig = { ...configA, gameId: variantGame.id, source: variant };
-    try {
-      validateConfig(entry.game, configA);
-      validateConfig(variantGame, configB);
-    } catch (err) {
-      return setIssues([err instanceof Error ? err.message : String(err)]);
-    }
-
-    const n = setup.numGames;
-    setProgress(0);
-    setRunning(true);
-    try {
-      // Both versions use the same seed, so each game starts from the same shuffle.
-      const recordsA = await runInWorkers(configA, n, setProgress);
-      const recordsB = await runInWorkers(configB, n, (done) => setProgress(n + done));
-      const summaryA = computeStats(entry.game, recordsA, configA);
-      const summaryB = computeStats(variantGame, recordsB, configB);
-      setResult({ rows: compareSummaries(summaryA, summaryB), changes });
-
-      const who = `${setup.numPlayers} players, ${describeAgents(setup.agents)}`;
-      const firstChange = (changes[0]?.added[0] ?? '').trim().replace(/^-\s*/, '').slice(0, 60) || 'lines removed';
-      Promise.all([
-        saveRun(makeSavedRun(`${entry.game.name} (original), ${who}`, configA, summaryA, recordsA)),
-        saveRun(makeSavedRun(`${variantGame.name} (changed: ${firstChange}), ${who}`, configB, summaryB, recordsB)),
-      ])
-        .then(onSaved)
-        .catch(() => {});
-    } catch (err) {
-      setIssues([err instanceof Error ? err.message : String(err)]);
-    } finally {
-      setRunning(false);
-    }
-  }
+  const picker = (label: string, value: number | '', set: (v: number | '') => void) => (
+    <label className="stack">
+      {label}
+      <select value={value} onChange={(e) => set(e.target.value === '' ? '' : Number(e.target.value))}>
+        <option value="">Choose a saved run…</option>
+        {runs?.map((r) => (
+          <option key={r.id} value={r.id}>
+            {runLabel(r)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <>
       <section className="card">
-        <h2>Compare two versions</h2>
+        <h2>Compare two runs</h2>
         <p className="muted">
-          Change something in the game's rules file (a card's cost, the hand size, a scoring rule) and see whether it really makes a
-          difference. Both versions play the same number of games with the same shuffles.
+          Pick two runs from Saved runs, for example a deck before and after you changed it in the sheet. The comparison shows what changed and
+          which differences are bigger than luck would explain. Runs with the same seed and number of games compare most fairly.
         </p>
-        <SetupFields games={games} entry={entry} onSelectGame={changeGame} setup={setup} onChange={setSetup} disabled={running} />
-
-        <h3>Your changed version</h3>
-        <label className="stack">
-          Edit the rules file below
-          <textarea className="code" rows={16} spellCheck={false} value={variant} disabled={running} onChange={(e) => setVariant(e.target.value)} />
-        </label>
-        {changes.length > 0 ? (
-          <ChangeList changes={changes} />
-        ) : (
-          <p className="muted small">No changes yet. For example, change a card's cost or the number of cards dealt.</p>
+        {error && <p className="error">{error}</p>}
+        {runs && runs.length < 2 && <p className="muted">Save at least two runs on the Simulate page first; every run is saved automatically.</p>}
+        {runs && runs.length >= 2 && (
+          <>
+            {picker('Run A (before)', a, setA)}
+            {picker('Run B (after)', b, setB)}
+            <div className="actions">
+              <button className="primary" disabled={a === '' || b === '' || a === b} onClick={() => setShown([a as number, b as number])}>
+                Compare
+              </button>
+            </div>
+          </>
         )}
-        <div className="actions">
-          <button className="primary" onClick={run} disabled={running || changes.length === 0}>
-            {running ? 'Running…' : `Compare (${(setup.numGames * 2).toLocaleString()} games)`}
-          </button>
-          <button onClick={() => setVariant(entry.source)} disabled={running || changes.length === 0}>
-            Undo my changes
-          </button>
-        </div>
-        {running && <ProgressBar done={progress} total={setup.numGames * 2} />}
-        {issues.length > 0 && (
-          <div className="error">
-            <p>The changed version has {issues.length === 1 ? 'a problem' : `${issues.length} problems`}:</p>
-            <ul className="issues">
-              {issues.map((issue, i) => (
-                <li key={i}>{issue}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {different && <p className="muted small">These runs are from different games or player counts, so some rows may not mean much.</p>}
       </section>
-
-      {result && <ComparisonView rows={result.rows} labelA="Original" labelB="Changed" changes={result.changes} />}
+      {runA && runB && (
+        <ComparisonView title="Comparison" rows={compareSummaries(runA.summary, runB.summary)} labelA={runA.label} labelB={runB.label} />
+      )}
     </>
   );
 }

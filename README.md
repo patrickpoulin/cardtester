@@ -5,54 +5,46 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 
 ## Using it
 
-1. Open the site, choose a game at the top of Simulate (Not Snap, a Marvel Snap-style lane battler,
-   or Rascally Raccoons, a race to hold Percy the Dog when the last raccoon turns up), then a deck
-   (the original or one you uploaded) and how well each player plays.
-2. Click **Run**. Your computer plays all the games, spread across its CPU cores.
-3. Read the report: win rate per seat with 95% confidence ranges, first-player advantage, comeback
+Every deck and its settings come from a Google Sheet, so cards and numbers are changed in the sheet
+and tested here.
+
+1. Open the site and choose a game at the top of Simulate: Not Snap, a Marvel Snap-style lane
+   battler, or Rascally Raccoons, a race to hold Percy the Dog when the last raccoon turns up.
+2. Under **Your Google Sheet**, click **Make a copy of the example sheet**. Share your copy as
+   **Anyone with the link can view** and paste its link into the box (or open the site with
+   `?sheet=<link>`). **Try it with the example** loads the read-only example as it is.
+3. Choose a deck from the sheet and how well each player plays, then click **Run**. Your computer
+   plays all the games, spread across its CPU cores.
+4. Read the report: win rate per seat with 95% confidence ranges, first-player advantage, comeback
    wins, lead changes, winning margins, game length, estimated playtime and which cards the winners
    played. **Watch one game** steps through a single game move by move. Download it as a spreadsheet
    (summary or one row per game).
 
-**Compare** tests a change: edit a copy of the game's rules (a card's cost, the hand size) and both
-versions are played with the same shuffles. The report says which differences are real and which
-could just be luck. Every run is kept under **Saved runs**, where any two can be compared.
+Change the sheet, click **Reload from sheet**, and run again. Every run is kept under **Saved runs**,
+and **Compare** puts any two of them side by side and says which differences are real and which
+could just be luck.
 
-New cards come in through **Upload Your Deck** on the Simulate page, as a file (Excel or CSV) or
-as rows copied from a spreadsheet and pasted in. Each game's rules stay fixed and its decks have
-their own columns (`src/deckFormats.ts`):
+Example sheets (read-only):
+[Not Snap](https://docs.google.com/spreadsheets/d/18MKJkmbiJXNpaWK75qcFVc-S_7cUKb3oKUIr3plwUuQ/edit?usp=sharing),
+[Rascally Raccoons](https://docs.google.com/spreadsheets/d/1ZEg5t5cTxueYxp50WYw0vDEU6uOupPD1n-r6cPwJ2NE/edit?usp=sharing).
 
-- **Not Snap** (`src/games/not-snap.yaml`): one row per card with Name, Per Player, Cost, Power, and
-  optionally an Effect from a fixed list with its Amount.
-- **Rascally Raccoons** (`src/games/rascally-raccoons.yaml`): one row per card with Card Name, Text,
-  Copies and Effect, the original card it plays like. Cards named like an original card don't need
-  an Effect, so the designer's card list uploads as it is.
+### The sheet
 
-Download the game's deck template there (it holds the original deck), change the cards, and upload
-it. The app checks the deck, plays test games, and adds it to Simulate and Compare as
-"<game>: <deck name>". Decks are kept in your browser and can be downloaded again as CSV.
-
-### Decks and settings from a Google Sheet
-
-A game's decks and settings can live in a Google Sheet, so they can be changed there without touching
-the site. Share the sheet as **Anyone with the link can view**, then paste its link into **Google Sheet**
-on the Simulate page (or open the site with `?sheet=<link>`). The site reads the sheet every time it
-opens (no API key needed); click **Reload from sheet** after editing it. If the sheet can't be reached,
-the last copy that loaded in this browser is used.
-
-The sheet needs:
+The site reads the sheet every time it opens (no API key needed). If the sheet can't be reached, the
+last copy that loaded in this browser is used. It needs:
 
 - a **Decks** tab with `Deck name` and `Tab` columns, one row per deck;
-- one tab per deck, in the same columns as the game's deck template;
-- optionally a **Settings** tab with `Setting` and `Value` columns. A setting must be one of the
-  game's `vars.shared` values; for Not Snap those are `openingHand`, `turns`, `handLimit`,
-  `drawPerTurn`, `cardsPerLocation`, `forgeBonus` and `bogPenalty`.
+- one tab per deck, in the game's card columns (`src/deckFormats.ts`):
+  - **Not Snap**: Name, Per Player, Cost, Power, and optionally an Effect from a fixed list with its
+    Amount, and Ability (text for people).
+  - **Rascally Raccoons**: Card Name, Text, Copies and Effect, the original card it plays like.
+    Cards named like an original card don't need an Effect.
+- optionally a **Settings** tab with `Setting` and `Value` columns. Not Snap's settings are
+  `openingHand`, `turns`, `handLimit`, `drawPerTurn`, `cardsPerLocation`, `forgeBonus` and
+  `bogPenalty`; Rascally Raccoons has `endYourTurnSkipsDraw`.
 
-Other tabs are ignored. Card behaviour still comes from the rules file: a deck picks one of the
-game's existing effects for each card. The loader is `src/sheet.ts`.
-
-The Excel templates are generated by `scripts/make-deck-template.py`; tests keep them in step with
-the rules files.
+Other tabs are ignored. Card behaviour comes from each game's rules file (`src/games/*.yaml`): a deck
+picks one of the game's existing effects for each card. The loader is `src/sheet.ts`.
 
 ## Development
 
@@ -78,8 +70,8 @@ npm run sim -- --file my-game.yaml --players 3
 | `docs/game-format.md` | Reference for writing game files |
 | `src/worker/`, `src/runner.ts` | Splits a run across one Web Worker per CPU core |
 | `src/deck.ts`, `src/raccoonDeck.ts` | Each game's decks: the effect list, checking a deck, and building its game |
-| `src/deckFormats.ts` | The games on the Simulate page, their deck columns and templates, and reading pasted rows |
-| `src/cardList.ts` | Reading a spreadsheet of cards (CSV or Excel) and merging its rows into a game file |
+| `src/deckFormats.ts` | The games on the Simulate page, their deck columns, settings and example sheets |
+| `src/sheet.ts`, `src/cardList.ts` | Reading a game's Google Sheet, and turning its rows of cards into a game file |
 | `src/ui/` | React interface |
 | `cli/` | Command-line runner using the same engine |
 | `tests/` | Vitest tests; `tests/fixtures/games/` keeps Crazy Eights, Hearts and a deck-builder for engine tests, and `tests/reference/crazyEights.ts` is a hand-written Crazy Eights used to check the interpreter |

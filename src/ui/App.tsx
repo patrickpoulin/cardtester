@@ -1,10 +1,7 @@
-import { useEffect, useState } from 'react';
-import { loadGame } from '../dsl/compile';
-import { formatOf, gamesOfKind } from '../deckFormats';
-import { BUILTIN_GAMES, type GameEntry } from '../games';
-import { deleteGame, listGames, saveGame } from '../report/storage';
+import { useState } from 'react';
+import { DECK_FORMATS, formatOf, gamesOfKind } from '../deckFormats';
+import type { GameEntry } from '../games';
 import { ComparePanel } from './ComparePanel';
-import { DeckUpload } from './DeckUpload';
 import { GamePicker } from './GamePicker';
 import { SavedRunsPanel } from './SavedRunsPanel';
 import { SheetSource } from './SheetSource';
@@ -20,51 +17,24 @@ type Tab = (typeof TABS)[number]['id'];
 
 export function App() {
   const [tab, setTab] = useState<Tab>('simulate');
-  const [games, setGames] = useState<GameEntry[]>(BUILTIN_GAMES);
-  const [selectedId, setSelectedId] = useState(BUILTIN_GAMES[0].game.id);
+  // Every deck comes from a game's Google Sheet; the games' rules files only supply the rules.
+  const [games, setGames] = useState<GameEntry[]>([]);
+  const [gameId, setGameId] = useState(DECK_FORMATS[0].gameId);
+  const [selectedId, setSelectedId] = useState('');
   const [savedVersion, setSavedVersion] = useState(0);
   const onSaved = () => setSavedVersion((v) => v + 1);
-  // The game chosen at the top of Simulate: a built-in game, whose uploaded decks are shown with it.
-  const format = formatOf(selectedId) ?? formatOf(BUILTIN_GAMES[0].game.id)!;
+  const format = formatOf(gameId)!;
+  const decks = gamesOfKind(games, gameId);
 
-  // Bring back decks uploaded on earlier visits (other games saved by older versions of the site are skipped).
-  useEffect(() => {
-    listGames()
-      .then((saved) => {
-        const entries = saved.filter((g) => formatOf(g.id) !== undefined).flatMap((g) => {
-          try {
-            return [{ game: loadGame(g.source), source: g.source, builtin: false }];
-          } catch {
-            return [];
-          }
-        });
-        setGames((prev) => [...prev, ...entries.filter((e) => !prev.some((p) => p.game.id === e.game.id))]);
-      })
-      .catch(() => {});
-  }, []);
-
-  function addGame(entry: GameEntry) {
-    setGames((prev) => [...prev.filter((g) => g.game.id !== entry.game.id), entry]);
-    setSelectedId(entry.game.id);
-    setTab('simulate');
-    saveGame(entry.game.id, entry.source).catch(() => {});
+  // A sheet's decks replace the ones it gave before. The first is chosen when nothing from this sheet was.
+  function setSheetGames(forGame: string, entries: GameEntry[], choose: boolean) {
+    setGames((prev) => [...prev.filter((g) => formatOf(g.game.id)?.gameId !== forGame), ...entries]);
+    setSelectedId((id) => (!choose && entries.some((e) => e.game.id === id) ? id : (entries[0]?.game.id ?? '')));
   }
 
-  // Decks from a game's Google Sheet replace the ones it gave before; they aren't saved in the browser, since the sheet is read on every visit.
-  function setSheetGames(gameId: string, entries: GameEntry[], choose: boolean) {
-    setGames((prev) => [
-      ...prev.filter((g) => !(g.fromSheet && formatOf(g.game.id)?.gameId === gameId) && !entries.some((e) => e.game.id === g.game.id)),
-      ...entries,
-    ]);
-    if (choose && entries.length) setSelectedId(entries[0].game.id);
-    else setSelectedId((id) => (id === gameId || entries.some((e) => e.game.id === id) || !isSheetDeck(id) ? id : gameId));
-  }
-  const isSheetDeck = (id: string) => games.some((g) => g.fromSheet && g.game.id === id);
-
-  function removeGame(id: string) {
-    setGames((prev) => prev.filter((g) => g.builtin || g.game.id !== id));
-    if (selectedId === id) setSelectedId(formatOf(id)?.gameId ?? BUILTIN_GAMES[0].game.id);
-    deleteGame(id).catch(() => {});
+  function chooseGame(id: string) {
+    setGameId(id);
+    setSelectedId(gamesOfKind(games, id)[0]?.game.id ?? '');
   }
 
   // Panels stay mounted while hidden so results survive switching tabs.
@@ -83,13 +53,19 @@ export function App() {
       </header>
       <main>
         <div hidden={tab !== 'simulate'}>
-          <GamePicker gameId={format.gameId} onChoose={setSelectedId} />
+          <GamePicker gameId={gameId} onChoose={chooseGame} />
           <SheetSource format={format} onLoad={setSheetGames} />
-          <DeckUpload format={format} decks={gamesOfKind(games, format.gameId).filter((g) => !g.builtin && !g.fromSheet)} onAdd={addGame} onRemove={removeGame} />
-          <SimulatePanel games={gamesOfKind(games, format.gameId)} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+          {decks.length > 0 ? (
+            <SimulatePanel games={decks} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+          ) : (
+            <section className="card">
+              <h2>Set up the test</h2>
+              <p className="muted">Load a Google Sheet above to choose a deck and run games.</p>
+            </section>
+          )}
         </div>
         <div hidden={tab !== 'compare'}>
-          <ComparePanel games={games} selectedId={selectedId} onSelect={setSelectedId} onSaved={onSaved} />
+          <ComparePanel version={savedVersion} />
         </div>
         <div hidden={tab !== 'saved'}>
           <SavedRunsPanel version={savedVersion} />

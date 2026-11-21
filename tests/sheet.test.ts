@@ -55,6 +55,20 @@ describe('Google Sheet decks', () => {
     expect(spec.cards).toHaveLength(10);
   });
 
+  it('only lets the sheet change the game\'s settings', () => {
+    const { games, notes } = sheetGames(notSnap, { ...TABS, Settings: q([['Setting', 'Value'], ['snapTurn', 3], ['turns', 5]]) });
+    expect(parseGameYaml(games[0].source).vars.shared).toMatchObject({ snapTurn: 1, turns: 5 });
+    expect(games[0].sheet?.settings).toEqual({ turns: 5 });
+    expect(notes[0]).toContain('snapTurn');
+  });
+
+  it('does not read a tab without a card name column as a deck', () => {
+    const readMe = q([['Not Snap: example sheet'], ['Use File > Make a copy']]);
+    const { games, issues } = sheetGames(notSnap, { Decks: DECKS, Settings: SETTINGS, 'Starter Deck': readMe });
+    expect(games).toEqual([]);
+    expect(issues).toContain('Starter: there\'s no tab named "Starter Deck"');
+  });
+
   it('keeps the default for a setting with a bad value', () => {
     const { rules, issues } = applySettings(NOT_SNAP_RULES, q([['Setting', 'Value'], ['turns', 'six']]));
     expect(issues[0]).toContain('turns must be a number');
