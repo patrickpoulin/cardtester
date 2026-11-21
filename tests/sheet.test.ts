@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DECK_FORMATS } from '../src/deckFormats';
 import { parseGameYaml } from '../src/dsl/compile';
 import { NOT_SNAP_RULES } from '../src/games';
-import { applySettings, fetchSheetTabs, sheetGames, sheetIdFromLink, tabCsvUrl, type SheetTabs } from '../src/sheet';
+import { applySettings, fetchSheetTabs, sheetFormat, sheetGames, sheetIdFromLink, tabCsvUrl, type SheetTabs } from '../src/sheet';
 
 const notSnap = DECK_FORMATS.find((f) => f.gameId === 'not-snap')!;
 const ID = '1Q9TuZoHzV5pTuSW08j5A92Ff4kPy2JkAq-xesGCp1x8';
@@ -42,6 +42,15 @@ describe('Google Sheet decks', () => {
     expect(sheetIdFromLink(ID)).toBe(ID);
     expect(sheetIdFromLink('https://example.com/nope')).toBeNull();
     expect(tabCsvUrl(ID, 'Starter Deck')).toContain('sheet=Starter%20Deck');
+  });
+
+  it('takes the game from the Decks tab, or from the deck columns', () => {
+    expect(sheetFormat(TABS).gameId).toBe('not-snap');
+    const raccoonDecks = q([['Game', 'Deck name', 'Tab'], ['Rascally Raccoons', 'Designer', 'Designer Deck']]);
+    expect(sheetFormat({ Decks: raccoonDecks }).gameId).toBe('rascally-raccoons');
+    const guessed = q([['Card Name', 'Text', 'Copies', 'Effect'], ['Percy the Dog', '', 1, '']]);
+    expect(sheetFormat({ Decks: q([['Deck name', 'Tab'], ['D', 'D']]), D: guessed }).gameId).toBe('rascally-raccoons');
+    expect(() => sheetFormat({ Decks: q([['Game', 'Deck name', 'Tab'], ['Hearts', 'D', 'D']]) })).toThrow('isn\'t one Card Tester knows');
   });
 
   it('builds a deck with the sheet settings', () => {
