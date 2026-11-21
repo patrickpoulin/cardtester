@@ -37,12 +37,13 @@ export function SheetSource({ format, onLoad }: Props) {
   const loadedFor = useRef<string | null>(null);
 
   function show(tabs: SheetTabs, fetchedAt: number, cached: string | null, choose: boolean) {
-    const result = sheetGames(format, tabs);
+    const result = sheetGames(format, tabs, fetchedAt);
     onLoad(gameId, result.games, choose && result.games.length > 0);
-    const decks = result.games.length === 1 ? '1 deck' : `${result.games.length} decks`;
+    const names = result.games.map((g) => g.game.name.replace(/^[^:]*:\s*/, '').replace(/\s*\(sheet\)$/, '')).join(', ');
+    const decks = (result.games.length === 1 ? '1 deck' : `${result.games.length} decks`) + (names ? ` (${names})` : '');
     setStatus({
       kind: cached ? 'cached' : result.games.length ? 'ok' : 'error',
-      text: cached ? `${cached} Using the copy from ${time(fetchedAt)}: ${decks}.` : `Loaded ${decks} from the sheet at ${time(fetchedAt)}.`,
+      text: cached ? `${cached} Using the copy from ${time(fetchedAt)}: ${decks}.` : `Loaded ${decks} from the sheet at ${time(fetchedAt)}. Choose them under "From your Google Sheet" in the Deck list below.`,
       issues: result.issues,
       notes: result.notes,
     });
