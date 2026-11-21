@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DECK_FORMATS } from '../src/deckFormats';
 import { parseGameYaml } from '../src/dsl/compile';
 import { NOT_SNAP_RULES } from '../src/games';
-import { applySettings, fetchSheetTabs, sheetFormat, sheetGames, sheetIdFromLink, tabCsvUrl, type SheetTabs } from '../src/sheet';
+import { applySettings, fetchSheetTabs, poolRows, sheetFormat, sheetGames, sheetIdFromLink, tabCsvUrl, type SheetTabs } from '../src/sheet';
 
 const notSnap = DECK_FORMATS.find((f) => f.gameId === 'not-snap')!;
 const ID = '1Q9TuZoHzV5pTuSW08j5A92Ff4kPy2JkAq-xesGCp1x8';
@@ -107,10 +107,13 @@ describe('Google Sheet decks', () => {
     const tabs = await fetchSheetTabs(ID, async (url) => {
       const tab = decodeURIComponent(/sheet=([^&]+)/.exec(url)![1]);
       asked.push(tab);
-      return { ok: true, status: 200, text: async () => TABS[tab] };
+      return { ok: true, status: 200, text: async () => TABS[tab] ?? DECKS };
     });
-    expect(asked).toEqual(['Decks', 'Settings', 'Starter Deck']);
-    expect(Object.keys(tabs)).toEqual(['Decks', 'Settings', 'Starter Deck']);
+    expect(asked).toEqual(['Decks', 'Settings', 'Card Pool', 'Starter Deck']);
+    expect(Object.keys(tabs)).toEqual(['Decks', 'Settings', 'Card Pool', 'Starter Deck']);
+    // There's no Card Pool tab, so Google sent the first tab, which isn't read as a pool.
+    expect(poolRows(tabs)).toEqual([]);
+    expect(poolRows({ ...tabs, 'Card Pool': STARTER.replace('Lantern Scout', 'Lantern') })).toHaveLength(10);
   });
 
   it('explains a sheet that is not shared', async () => {

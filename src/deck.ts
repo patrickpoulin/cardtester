@@ -116,13 +116,33 @@ export function withAbilities(rules: string, cards: CardRow[], book?: AbilityBoo
   if (!used.size) return { rules, cards };
   return {
     rules: rulesWithAbilities(rules, used),
-    cards: marked.map(({ card, id }) => ({ ...card, attrs: { ...card.attrs, ...abilityAttrs(id) } })),
+    cards: marked.map(({ card, id }) => ({ ...card, attrs: { ...card.attrs, ...abilityAttrs(id), title: String(card.attrs.title ?? card.name) } })),
   };
 }
 
+/**
+ * Cards abilities can create: the sheet's Card Pool tab, placed in the shared pool zone (Copies
+ * each, 2 by default). A name the deck already uses gets " (pool)" added, since names must be
+ * unique; abilities find cards by `title`, which keeps the name as written.
+ */
+export function poolCards(pool: CardRow[], deck: CardRow[]): CardRow[] {
+  const taken = new Set(deck.map((c) => c.name));
+  return normalizeDeck(pool).map((c, i) => ({
+    name: taken.has(c.name) ? `${c.name} (pool)` : c.name,
+    count: pool[i].count ?? pool[i].perPlayer ?? 2,
+    zone: 'pool',
+    attrs: { ...c.attrs, title: c.name },
+  }));
+}
+
 /** The Not Snap rules with the starter deck replaced by this deck, and the cards' translated abilities if a book is given. */
-export function deckGame(baseRules: string, rows: CardRow[], deckName: string, book?: AbilityBook): GameEntry {
-  const { rules, cards } = withAbilities(baseRules, normalizeDeck(rows), book);
+export function deckGame(baseRules: string, rows: CardRow[], deckName: string, book?: AbilityBook, pool: CardRow[] = []): GameEntry {
+  const deck = normalizeDeck(rows);
+  const all = [...deck, ...(pool.length ? poolCards(pool, deck) : [])];
+  const withAi = withAbilities(baseRules, all, book);
+  const rules = withAi.rules;
+  // Pool cards only go in when the rules have the pool zone (some card has an ability).
+  const cards = rules === baseRules ? deck : withAi.cards;
   const doc = parseDocument(rules);
   doc.set('cards', doc.createNode([]));
   const slug = deckName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'deck';

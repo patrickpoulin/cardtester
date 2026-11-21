@@ -9,7 +9,7 @@ import { getAgent } from '../src/engine/agents';
 import { Rng } from '../src/engine/rng';
 import { NOT_SNAP_RULES } from '../src/games';
 
-const blank = { summary: 's', onReveal: '', ongoingMine: '', ongoingTheirs: '', whenDestroyed: '', endOfTurn: '', unsupported: '' };
+const blank = { summary: 's', onReveal: '', ongoingMine: '', ongoingTheirs: '', whenDestroyed: '', endOfTurn: '', gameStart: '', afterCardPlayed: '', whenCardDestroyed: '', unsupported: '' };
 const A = (text: string, code: Partial<CardAbility>): CardAbility => ({ ...blank, text, ...code });
 
 const DRAW = A('On Reveal: draw 2 cards.', {
@@ -92,6 +92,120 @@ describe('card text translated by Claude', () => {
     expect(grown).toBeGreaterThan(0);
   });
 
+  describe('the newer hooks', () => {
+    const COPY = A('On Reveal: copy the On Reveal of the last card you played.', {
+      onReveal: `- if: "owner.lastPlayed != null and contains(revealIds, owner.lastPlayed.ai)"
+  then:
+    - set: { var: owner.copyReveal, value: owner.lastPlayed.ai }`,
+    });
+    const ANGELA = A('After you play a card here, +1 Power.', {
+      afterCardPlayed: `- if: "player.index == owner.index and laneNum(player, played) == lane"
+  then:
+    - add: { var: self.power, value: 1 }`,
+    });
+    const WATCH = A('When one of your cards is destroyed, +2 Power.', {
+      whenCardDestroyed: `- if: "victimOwner.index == owner.index"
+  then:
+    - add: { var: self.power, value: 2 }`,
+    });
+    const ARCANA = A('Game Start: shuffle 2 Ancient Arcana into your deck.', {
+      gameStart: `- forEach:
+    in: "range(2)"
+    as: k
+    do:
+      - if: "any(pool, c => c.title == 'Ancient Arcana')"
+        then:
+          - move: { card: "top(filter(pool, c => c.title == 'Ancient Arcana'))", to: owner.deck }
+- shuffle: owner.deck`,
+    });
+    const RANDOM = A('On Reveal: add a random 3-Cost card to your hand.', {
+      onReveal: `- if: "len(owner.hand) < handLimit and any(pool, c => c.cost == 3)"
+  then:
+    - move: { card: "top(filter(pool, c => c.cost == 3))", to: owner.hand }`,
+    });
+    const BANISH = A('On Reveal: banish this.', { onReveal: '- move: { card: self, to: owner.banished }' });
+    const SILENCE = A('On Reveal: remove the text from enemy cards here.', {
+      onReveal: '- forEach: { in: "laneOf(opponent(owner), lane)", as: c, do: [ { set: { var: c.ai, value: "\'\'" } } ] }',
+    });
+    const NEW = [COPY, ANGELA, WATCH, ARCANA, RANDOM, BANISH, SILENCE];
+    const POOL = [row('Ancient Arcana', 0, 1), row('Mystic', 3, 4), row('Sage', 3, 3, DRAW.text)];
+
+    it('copies the On Reveal of the last card played', () => {
+      const filler = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((n) => row(n, 6, 1));
+      const entry = deckGame(NOT_SNAP_RULES, [row('Lookout', 1, 1, DRAW.text), row('Absorber', 1, 1, COPY.text), ...filler], 'Copy', new Map([DRAW, COPY].map((a) => [abilityKey(a.text), a])));
+      const game = entry.game;
+      type C = { title: string };
+      type S = { players: { hand: C[]; deck: C[] }[]; current: number };
+      const state = game.setup(2, new Rng(1)) as S;
+      const rng = new Rng(2);
+      const play = (title: string) => {
+        const action = game.legalActions(state).find((a) => (a as { cardId?: number }).cardId !== undefined && JSON.stringify(a).includes('"lane":1') && state.players[state.current].hand.some((c) => c.title === title && (c as never as { id: number }).id === (a as { cardId?: number }).cardId));
+        if (!action) throw new Error(`can't play ${title}: ${JSON.stringify(game.legalActions(state))}`);
+        game.applyAction(state, action, rng);
+      };
+      // Turn 1 for both players, then turn 2: player 1 plays Lookout (draws 2) then Absorber (copies it).
+      const endTurn = () => game.applyAction(state, game.legalActions(state).find((a) => JSON.stringify(a).includes('end-turn'))!, rng);
+      endTurn();
+      endTurn();
+      // Put both cards in player 1's hand, swapping out others.
+      const p1 = state.players[0];
+      for (const title of ['Lookout', 'Absorber']) {
+        const where = p1.hand.some((c) => c.title === title) ? null : p1.deck.findIndex((c) => c.title === title);
+        if (where !== null) p1.hand.push(...p1.deck.splice(where, 1));
+      }
+      while (p1.hand.length > 5) p1.deck.unshift(p1.hand.splice(p1.hand.findIndex((c) => !['Lookout', 'Absorber'].includes(c.title)), 1)[0]);
+      const before = p1.hand.length;
+      play('Lookout');
+      play('Absorber');
+      // 5 in hand: Lookout played (4) draws 2 (6), Absorber played (5) copies it and draws 2 (7).
+      expect(before).toBe(5);
+      expect(p1.hand.length).toBe(7);
+    });
+
+    it('each works in test play', () => {
+      for (const a of NEW) expect(checkAbility(a, POOL), a.text).toEqual([]);
+    });
+
+    it('play together, with a card pool', () => {
+      const deck = [
+        row('Absorber', 2, 2, COPY.text), row('Lookout', 1, 1, DRAW.text), row('Assassin', 2, 2, DESTROY.text), row('Angela', 2, 2, ANGELA.text),
+        row('Watcher', 3, 2, WATCH.text), row('Agamotto', 5, 6, ARCANA.text), row('Agent', 1, 2, RANDOM.text), row('Ghost', 1, 3, BANISH.text),
+        row('Silencer', 3, 3, SILENCE.text), row('Captain', 3, 3, AURA.text), row('Martyr', 1, 1, REVENGE.text),
+      ];
+      const book = new Map([...ALL, ...NEW].map((a) => [abilityKey(a.text), a]));
+      const entry = deckGame(NOT_SNAP_RULES, deck, 'Hooks', book, POOL);
+      expect(smokeTest(entry.game, 50)).toEqual([]);
+      const agent = getAgent('greedy');
+      type C = { title: string; power: number; ai: string };
+      type P = { deck: C[]; hand: C[]; banished: C[]; destroyed: C[]; lane1: C[]; lane2: C[]; lane3: C[] };
+      let arcana = 0, fromPool = 0, banished = 0, angela = 0, silenced = 0, watcher = 0;
+      for (let i = 0; i < 40; i++) {
+        const rng = new Rng(i + 1);
+        const state = game().setup(2, rng) as { players: P[]; pool: C[] };
+        const start = state.players.map((p) => [...p.deck, ...p.hand].filter((c) => c.title === 'Ancient Arcana').length);
+        arcana += start[0] + start[1];
+        while (!game().isTerminal(state)) game().applyAction(state, agent.choose(game(), state, game().legalActions(state), rng), rng);
+        for (const p of state.players) {
+          const all = [...p.deck, ...p.hand, ...p.destroyed, ...p.banished, ...p.lane1, ...p.lane2, ...p.lane3];
+          fromPool += all.filter((c) => c.title === 'Mystic' || c.title === 'Sage').length;
+          banished += p.banished.length;
+          watcher += [...p.hand, ...p.deck, ...p.lane1, ...p.lane2, ...p.lane3].filter((c) => c.title === 'Watcher' && c.power > 2).length;
+          angela += [...p.lane1, ...p.lane2, ...p.lane3].filter((c) => c.title === 'Angela' && c.power > 2).length;
+          silenced += [...p.lane1, ...p.lane2, ...p.lane3].filter((c) => c.ai === '' && ['Captain', 'Assassin', 'Watcher'].includes(c.title)).length;
+        }
+      }
+      function game() {
+        return entry.game;
+      }
+      expect(arcana).toBeGreaterThan(0);
+      expect(fromPool).toBeGreaterThan(0);
+      expect(banished).toBeGreaterThan(0);
+      expect(angela).toBeGreaterThan(0);
+      expect(silenced).toBeGreaterThan(0);
+      expect(watcher).toBeGreaterThan(0);
+    });
+  });
+
   it('adds Ongoing power to the location', () => {
     const entry = deckGame(NOT_SNAP_RULES, DECK, 'Test', new Map([[abilityKey(AURA.text), AURA]]));
     const define = parseGameYaml(entry.source).define as Record<string, string>;
@@ -122,14 +236,14 @@ describe('card text translated by Claude', () => {
       { cards: [{ ...DRAW }, { ...GROW, endOfTurn: '- add: { var: self.mana, value: 1 }' }] },
       { cards: [{ ...GROW }] },
     ];
-    const results = await translateTexts([DRAW.text, GROW.text], 'key', undefined, async (prompt) => {
+    const results = await translateTexts([DRAW.text, GROW.text], 'key', { ask: async (prompt) => {
       asked.push(prompt);
       return JSON.stringify(answers[asked.length - 1]);
-    });
+    } });
     expect(asked).toHaveLength(2);
     expect(asked[1]).toContain('self.mana');
     expect(results.map((r) => r.problems)).toEqual([[], []]);
     expect(savedBook().get(abilityKey(GROW.text))?.endOfTurn).toBe(GROW.endOfTurn);
-    expect(JSON.parse(store.get('cardtester.abilities.v1')!)).toHaveLength(2);
+    expect(JSON.parse(store.get('cardtester.abilities.v2')!)).toHaveLength(2);
   });
 });
