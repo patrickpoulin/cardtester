@@ -11,6 +11,8 @@ export interface GameEntry {
   builtin: boolean;
   /** Loaded from a Google Sheet: shown with the game but not saved in the browser. */
   fromSheet?: boolean;
+  /** For a deck from a Google Sheet: its tab, when the sheet was read, and the settings the sheet changed from the rules' defaults. */
+  sheet?: { tab: string; fetchedAt?: number; settings: Record<string, number | boolean> };
 }
 
 /** The rules every uploaded deck for each game is played with. */

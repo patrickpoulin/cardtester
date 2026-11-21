@@ -96,17 +96,21 @@ function isOtherTab(csv: string, wanted: string): boolean {
 }
 
 /** The rules with the Settings tab's values in place of their defaults. */
-export function applySettings(rules: string, settingsCsv: string | undefined): { rules: string; issues: string[]; notes: string[] } {
+export function applySettings(
+  rules: string,
+  settingsCsv: string | undefined,
+): { rules: string; issues: string[]; notes: string[]; changed: Record<string, number | boolean> } {
   const issues: string[] = [];
   const notes: string[] = [];
-  if (settingsCsv === undefined || isOtherTab(settingsCsv, SETTINGS_TAB)) return { rules, issues, notes };
+  const changed: Record<string, number | boolean> = {};
+  if (settingsCsv === undefined || isOtherTab(settingsCsv, SETTINGS_TAB)) return { rules, issues, notes, changed };
   const rows = table(settingsCsv);
   const h = (rows[0] ?? []).map((c) => c.trim().toLowerCase());
   const nameCol = col(h, 'setting');
   const valueCol = col(h, 'value');
   const doc = parseDocument(rules);
   const shared = doc.getIn(['vars', 'shared']);
-  if (!isMap(shared)) return { rules, issues, notes };
+  if (!isMap(shared)) return { rules, issues, notes, changed };
   const defaults = shared.toJSON() as Record<string, unknown>;
   const unused: string[] = [];
   rows.slice(1).forEach((r, i) => {
@@ -130,9 +134,10 @@ export function applySettings(rules: string, settingsCsv: string | undefined): {
       return;
     }
     shared.set(name, value);
+    if (value !== current) changed[name] = value;
   });
   if (unused.length) notes.push(`Not used, since the rules have no setting by that name: ${unused.join(', ')}.`);
-  return { rules: doc.toString({ lineWidth: 0 }), issues, notes };
+  return { rules: doc.toString({ lineWidth: 0 }), issues, notes, changed };
 }
 
 export interface SheetGames {
@@ -144,7 +149,7 @@ export interface SheetGames {
 }
 
 /** Builds a game for each deck in the sheet, with the sheet's settings. A deck with problems is left out and its problems listed. */
-export function sheetGames(format: DeckFormat, tabs: SheetTabs): SheetGames {
+export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: number): SheetGames {
   const decksCsv = tabs[DECKS_TAB];
   if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) throw new SheetError(`The sheet needs a tab named "${DECKS_TAB}" with Deck name and Tab columns`);
   const settings = applySettings(format.rules, tabs[SETTINGS_TAB]);
@@ -166,7 +171,7 @@ export function sheetGames(format: DeckFormat, tabs: SheetTabs): SheetGames {
         issues.push(...problems.map((p) => `${deck.name}: ${p}`));
         continue;
       }
-      games.push({ ...entry, fromSheet: true });
+      games.push({ ...entry, fromSheet: true, sheet: { tab: deck.tab, fetchedAt, settings: settings.changed } });
     } catch (err) {
       const list = err instanceof DeckError || err instanceof GameDefinitionError ? err.issues : [err instanceof CardListError || err instanceof Error ? err.message : String(err)];
       issues.push(...list.map((p) => `${deck.name}: ${p}`));

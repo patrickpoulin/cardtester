@@ -2,6 +2,7 @@ import { AGENTS, getAgent } from '../engine/agents';
 import type { SimConfig } from '../engine/simulate';
 import type { AnyGame } from '../engine/types';
 import type { GameEntry } from '../games';
+import { DeckSource, ORIGIN_LABELS, deckLabel, originOf, type DeckOrigin } from './DeckSource';
 
 export interface RunSetup {
   numPlayers: number;
@@ -54,12 +55,27 @@ export function SetupFields({ games, entry, onSelectGame, setup, onChange, disab
         <label>
           {decks ? 'Deck' : 'Game'}
           <select value={game.id} onChange={(e) => onSelectGame(e.target.value)} disabled={disabled}>
-            {games.map((g) => (
-              <option key={g.game.id} value={g.game.id}>
-                {decks ? (g.builtin ? 'Original deck' : g.game.name.replace(/^[^:]*:\s*/, '')) : g.game.name}
-                {g.builtin || g.fromSheet ? '' : ' (yours)'}
-              </option>
-            ))}
+            {decks
+              ? (['builtin', 'sheet', 'uploaded'] as DeckOrigin[]).map((origin) => {
+                  const group = games.filter((g) => originOf(g) === origin);
+                  return (
+                    group.length > 0 && (
+                      <optgroup key={origin} label={ORIGIN_LABELS[origin]}>
+                        {group.map((g) => (
+                          <option key={g.game.id} value={g.game.id}>
+                            {deckLabel(g)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  );
+                })
+              : games.map((g) => (
+                  <option key={g.game.id} value={g.game.id}>
+                    {g.game.name}
+                    {g.builtin || g.fromSheet ? '' : ' (yours)'}
+                  </option>
+                ))}
           </select>
         </label>
         <label>
@@ -90,6 +106,7 @@ export function SetupFields({ games, entry, onSelectGame, setup, onChange, disab
           <input type="number" value={setup.seed} disabled={disabled} onChange={(e) => onChange({ ...setup, seed: Number(e.target.value) || 0 })} />
         </label>
       </div>
+      {decks && <DeckSource entry={entry} builtin={games.find((g) => g.builtin) ?? entry} />}
       <p className="muted small">
         {game.description} {game.minPlayers === game.maxPlayers ? `${game.minPlayers} players.` : `${game.minPlayers}-${game.maxPlayers} players.`}
       </p>
