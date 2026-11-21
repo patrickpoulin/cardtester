@@ -49,7 +49,7 @@ export function DeckSource({ entry }: Props) {
 
   const gameId = formatOf(entry.game.id)?.gameId;
   const gameName = gameId ? builtinGame(gameId).game.name : entry.game.name;
-  const where = `Game: ${gameName} (named in your sheet). This deck was read from the "${entry.sheet?.tab ?? ''}" tab${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. Click Load sheet above after editing it.`;
+  const where = `Game: ${gameName} (named in your sheet). This deck was read from the "${entry.sheet?.tab ?? ''}" tab${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. After editing the sheet, click Analyze above.`;
 
   return (
     <div className="deck-source">
