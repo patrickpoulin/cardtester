@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { builtinGame, type DeckFormat } from '../deckFormats';
+import { DECK_FORMATS, builtinGame } from '../deckFormats';
 import type { GameEntry } from '../games';
-import { fetchSheetTabs, savedSheet, saveSheet, sheetGames, sheetIdFromLink, type SheetTabs } from '../sheet';
+import { fetchSheetTabs, savedSheet, saveSheet, sheetFormat, sheetGames, sheetIdFromLink, type SheetTabs } from '../sheet';
 
 interface Props {
-  format: DeckFormat;
-  /** Replaces this game's decks from the sheet. `choose` is true when the person asked for the load. */
-  onLoad(gameId: string, games: GameEntry[], choose: boolean): void;
+  /** Replaces the decks with the sheet's, built with the rules of the game the sheet names. `choose` is true when the person asked for the load. */
+  onLoad(games: GameEntry[], choose: boolean): void;
 }
 
 interface Status {
@@ -17,37 +16,45 @@ interface Status {
 }
 
 const time = (ms: number) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+/** The browser remembers one sheet. */
+const STORE = 'current';
+const sheetUrl = (id: string, page: string) => `https://docs.google.com/spreadsheets/d/${id}/${page}`;
 
-/** A link given as ?sheet=… (with &game=… for a game other than the first) is used once and remembered. */
-function linkFromAddress(gameId: string, firstGameId: string): string | null {
+/** A link given as ?sheet=… is used once and remembered. */
+function linkFromAddress(): string | null {
   try {
-    const params = new URLSearchParams(window.location.search);
-    const link = params.get('sheet');
-    return link && (params.get('game') ?? firstGameId) === gameId ? link : null;
+    return new URLSearchParams(window.location.search).get('sheet');
   } catch {
     return null;
   }
 }
 
-export function SheetSource({ format, onLoad }: Props) {
-  const gameId = format.gameId;
-  const gameName = builtinGame(gameId).game.name + ' deck';
+export function SheetSource({ onLoad }: Props) {
   const [link, setLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
-  const loadedFor = useRef<string | null>(null);
+  const started = useRef(false);
 
   function show(tabs: SheetTabs, fetchedAt: number, cached: string | null, choose: boolean) {
+    const format = sheetFormat(tabs);
     const result = sheetGames(format, tabs, fetchedAt);
-    onLoad(gameId, result.games, choose && result.games.length > 0);
+    onLoad(result.games, choose && result.games.length > 0);
     const names = result.games.map((g) => g.game.name.replace(/^[^:]*:\s*/, '').replace(/\s*\(sheet\)$/, '')).join(', ');
     const decks = (result.games.length === 1 ? '1 deck' : `${result.games.length} decks`) + (names ? ` (${names})` : '');
+    const game = builtinGame(format.gameId).game.name;
     setStatus({
       kind: cached ? 'cached' : result.games.length ? 'ok' : 'error',
-      text: cached ? `${cached} Using the copy from ${time(fetchedAt)}: ${decks}.` : `Loaded ${decks} from the sheet at ${time(fetchedAt)}. Choose one in the Deck list below.`,
+      text: cached
+        ? `${cached} Using the copy from ${time(fetchedAt)}: ${game}, ${decks}.`
+        : `Loaded ${game} from the sheet at ${time(fetchedAt)}: ${decks}.`,
       issues: result.issues,
       notes: result.notes,
     });
+  }
+
+  function fail(err: unknown) {
+    setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err), issues: [], notes: [] });
+    onLoad([], false);
   }
 
   async function load(sheetLink: string, choose: boolean) {
@@ -57,78 +64,111 @@ export function SheetSource({ format, onLoad }: Props) {
       return;
     }
     setLoading(true);
-    const saved = savedSheet(gameId);
+    const saved = savedSheet(STORE);
+    let tabs: SheetTabs;
     try {
-      const tabs = await fetchSheetTabs(id);
+      tabs = await fetchSheetTabs(id);
+    } catch (err) {
+      // Offline or unreachable: use the last copy of this sheet that loaded.
+      const message = err instanceof Error ? err.message : String(err);
+      saveSheet(STORE, { ...saved, link: sheetLink });
+      try {
+        if (saved?.tabs && saved.fetchedAt && saved.link === sheetLink) show(saved.tabs, saved.fetchedAt, message, choose);
+        else fail(err);
+      } catch (inner) {
+        fail(inner);
+      }
+      setLoading(false);
+      return;
+    }
+    try {
       const fetchedAt = Date.now();
-      saveSheet(gameId, { link: sheetLink, fetchedAt, tabs });
+      saveSheet(STORE, { link: sheetLink, fetchedAt, tabs });
       show(tabs, fetchedAt, null, choose);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      saveSheet(gameId, { ...saved, link: sheetLink });
-      if (saved?.tabs && saved.fetchedAt && saved.link === sheetLink) {
-        try {
-          show(saved.tabs, saved.fetchedAt, message, choose);
-        } catch (inner) {
-          setStatus({ kind: 'error', text: inner instanceof Error ? inner.message : String(inner), issues: [], notes: [] });
-        }
-      } else {
-        setStatus({ kind: 'error', text: message, issues: [], notes: [] });
-      }
+      fail(err);
     } finally {
       setLoading(false);
     }
   }
 
-  // Each game remembers its own sheet; it's read again whenever the game is shown.
+  // The remembered sheet is read again each time the site opens.
   useEffect(() => {
-    if (loadedFor.current === gameId) return;
-    loadedFor.current = gameId;
-    const fromAddress = linkFromAddress(gameId, 'not-snap');
-    const saved = fromAddress ?? savedSheet(gameId)?.link ?? '';
+    if (started.current) return;
+    started.current = true;
+    const fromAddress = linkFromAddress();
+    const saved = fromAddress ?? savedSheet(STORE)?.link ?? '';
     setLink(saved);
-    setStatus(null);
     if (saved) load(saved, Boolean(fromAddress));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId]);
+  }, []);
 
   function forget() {
-    saveSheet(gameId, null);
+    saveSheet(STORE, null);
     setLink('');
     setStatus(null);
-    onLoad(gameId, [], false);
+    onLoad([], false);
   }
 
   return (
     <section className="card">
       <h2>Your Google Sheet</h2>
       <p className="muted">
-        {gameName}s and settings come from a Google Sheet, so you change cards and rules there and test them here. Start from the
-        example: make your own copy, share your copy as "Anyone with the link can view", and paste its link below. The site reads the sheet
-        each time it opens; click Reload from sheet after you change it.
+        The game, its settings and its decks all come from a Google Sheet, so you change cards and rules there and test them here. Start from
+        an example: make your own copy, share your copy as "Anyone with the link can view", and paste its link below. The site reads the
+        sheet each time it opens; click Load sheet again after you change it.
       </p>
-      <div className="actions tight">
-        <a className="button" href={`https://docs.google.com/spreadsheets/d/${format.exampleSheet}/copy`} target="_blank" rel="noreferrer">
-          Make a copy of the example sheet
-        </a>
-        <a className="button" href={`https://docs.google.com/spreadsheets/d/${format.exampleSheet}/edit?usp=sharing`} target="_blank" rel="noreferrer">
-          View the example (read-only)
-        </a>
-        <button
-          onClick={() => {
-            const example = `https://docs.google.com/spreadsheets/d/${format.exampleSheet}/edit`;
-            setLink(example);
-            load(example, true);
-          }}
-          disabled={loading}
-        >
-          Try it with the example
-        </button>
-      </div>
-      <p className="muted small">
-        The sheet needs a Decks tab (Deck name, Tab), one tab per deck in this game's card columns ({format.columns.join(', ')}), and
-        optionally a Settings tab (Setting, Value) with any of: {format.settings.join(', ')}.
-      </p>
+      <table className="effects examples">
+        <tbody>
+          {DECK_FORMATS.map((f) => {
+            const game = builtinGame(f.gameId).game;
+            return (
+              <tr key={f.gameId}>
+                <td>
+                  <strong>{game.name}</strong> example
+                  <div className="muted small">{game.description}</div>
+                </td>
+                <td className="nowrap">
+                  <a href={sheetUrl(f.exampleSheet, 'copy')} target="_blank" rel="noreferrer">
+                    Make a copy
+                  </a>
+                  {' · '}
+                  <a href={sheetUrl(f.exampleSheet, 'edit?usp=sharing')} target="_blank" rel="noreferrer">
+                    View
+                  </a>
+                  {' · '}
+                  <button
+                    className="link"
+                    disabled={loading}
+                    onClick={() => {
+                      const example = sheetUrl(f.exampleSheet, 'edit');
+                      setLink(example);
+                      load(example, true);
+                    }}
+                  >
+                    Try it
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <details className="source">
+        <summary>What the sheet needs</summary>
+        <ul className="small">
+          <li>
+            A <strong>Decks</strong> tab with Game ({DECK_FORMATS.map((f) => builtinGame(f.gameId).game.name).join(' or ')}), Deck name and Tab
+            columns, one row per deck.
+          </li>
+          {DECK_FORMATS.map((f) => (
+            <li key={f.gameId}>
+              {builtinGame(f.gameId).game.name}: one tab per deck with columns {f.columns.join(', ')}; an optional <strong>Settings</strong> tab
+              (Setting, Value) can change {f.settings.join(', ')}.
+            </li>
+          ))}
+        </ul>
+      </details>
       <label className="stack">
         Sheet link
         <input
@@ -144,7 +184,7 @@ export function SheetSource({ format, onLoad }: Props) {
       </label>
       <div className="actions tight">
         <button className="primary" onClick={() => load(link, true)} disabled={loading || !link.trim()}>
-          {loading ? 'Reading the sheet…' : status ? 'Reload from sheet' : 'Load sheet'}
+          {loading ? 'Reading the sheet…' : 'Load sheet'}
         </button>
         {link && (
           <button className="link" onClick={forget} disabled={loading}>

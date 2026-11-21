@@ -1,7 +1,7 @@
 import { isMap, parseDocument } from 'yaml';
 import { type CardRow, cardRows, CardListError, parseDelimited } from './cardList';
 import { DeckError } from './deck';
-import type { DeckFormat } from './deckFormats';
+import { DECK_FORMATS, builtinGame, type DeckFormat } from './deckFormats';
 import { GameDefinitionError } from './dsl/compile';
 import { smokeTest } from './dsl/smoke';
 import type { GameEntry } from './games';
@@ -11,7 +11,8 @@ import type { GameEntry } from './games';
  * The sheet is shared as "Anyone with the link can view" and each tab is read as CSV through Google's
  * query endpoint, so no API key or sign-in is needed. The tabs:
  *
- * - Decks: Deck name, Tab (the tab holding its cards). One row per deck.
+ * - Decks: Deck name, Tab (the tab holding its cards), and Game, which game's rules the sheet uses
+ *   (Not Snap or Rascally Raccoons; without it the game is worked out from the deck tab's columns).
  * - Settings (optional): Setting, Value. Each setting must be one the game allows (DeckFormat.settings,
  *   values under vars.shared in its rules file); it replaces that value for every deck in the sheet.
  * - One tab per deck, in the same columns as the game's deck template.
@@ -58,6 +59,32 @@ export function deckList(decksCsv: string): { name: string; tab: string }[] {
     .map((r) => ({ name: (r[nameCol] ?? '').trim(), tab: (r[tabCol] ?? '').trim() }))
     .filter((d) => d.name || d.tab)
     .map((d) => ({ name: d.name || d.tab, tab: d.tab || d.name }));
+}
+
+const letters = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/**
+ * Which game's rules the sheet uses: the Decks tab's Game column, or else the game whose card
+ * columns best match the first deck tab.
+ */
+export function sheetFormat(tabs: SheetTabs): DeckFormat {
+  const decksCsv = tabs[DECKS_TAB];
+  if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) throw new SheetError(`The sheet needs a tab named "${DECKS_TAB}" with Deck name and Tab columns`);
+  const rows = table(decksCsv);
+  const gameCol = col((rows[0] ?? []).map((c) => c.trim().toLowerCase()), 'game');
+  const named = gameCol < 0 ? '' : (rows.slice(1).map((r) => (r[gameCol] ?? '').trim()).find(Boolean) ?? '');
+  const names = DECK_FORMATS.map((f) => builtinGame(f.gameId).game.name);
+  if (named) {
+    const found = DECK_FORMATS.find((f) => letters(f.gameId) === letters(named) || letters(builtinGame(f.gameId).game.name) === letters(named));
+    if (!found) throw new SheetError(`The Game "${named}" on the ${DECKS_TAB} tab isn't one Card Tester knows; use ${names.join(' or ')}`);
+    return found;
+  }
+  const first = deckList(decksCsv).map((d) => tabs[d.tab]).find((csv) => csv !== undefined && !isOtherTab(csv, ''));
+  const h = first === undefined ? [] : header(first);
+  const scored = DECK_FORMATS.map((f) => ({ f, score: f.columns.filter((c) => h.includes(c.toLowerCase())).length })).sort((a, b) => b.score - a.score);
+  if (!scored[0] || scored[0].score === 0 || scored[0].score === scored[1]?.score)
+    throw new SheetError(`Add a Game column to the ${DECKS_TAB} tab saying which game the sheet is for (${names.join(' or ')})`);
+  return scored[0].f;
 }
 
 /** Reads the Decks tab, the Settings tab and every deck tab the Decks tab lists. */

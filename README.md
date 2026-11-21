@@ -5,14 +5,14 @@ Everything runs in your browser, so the site is hosted for free on GitHub Pages.
 
 ## Using it
 
-Every deck and its settings come from a Google Sheet, so cards and numbers are changed in the sheet
+The game, its settings and its decks all come from a Google Sheet, so cards and numbers are changed in the sheet
 and tested here.
 
-1. Open the site and choose a game at the top of Simulate: Not Snap, a Marvel Snap-style lane
-   battler, or Rascally Raccoons, a race to hold Percy the Dog when the last raccoon turns up.
-2. Under **Your Google Sheet**, click **Make a copy of the example sheet**. Share your copy as
-   **Anyone with the link can view** and paste its link into the box (or open the site with
-   `?sheet=<link>`). **Try it with the example** loads the read-only example as it is.
+1. Open the site. Under **Your Google Sheet**, pick an example (Not Snap, a Marvel Snap-style lane
+   battler, or Rascally Raccoons, a race to hold Percy the Dog when the last raccoon turns up) and
+   click **Make a copy**. Share your copy as **Anyone with the link can view** and paste its link
+   into the box (or open the site with `?sheet=<link>`). **Try it** loads an example as it is.
+2. The sheet says which game it is, so its rules, settings and decks all load together.
 3. Choose a deck from the sheet and how well each player plays, then click **Run**. Your computer
    plays all the games, spread across its CPU cores.
 4. Read the report: win rate per seat with 95% confidence ranges, first-player advantage, comeback
@@ -20,7 +20,7 @@ and tested here.
    played. **Watch one game** steps through a single game move by move. Download it as a spreadsheet
    (summary or one row per game).
 
-Change the sheet, click **Reload from sheet**, and run again. Every run is kept under **Saved runs**,
+Change the sheet, click **Load sheet** again, and run again. Every run is kept under **Saved runs**,
 and **Compare** puts any two of them side by side and says which differences are real and which
 could just be luck.
 
@@ -33,7 +33,8 @@ Example sheets (read-only):
 The site reads the sheet every time it opens (no API key needed). If the sheet can't be reached, the
 last copy that loaded in this browser is used. It needs:
 
-- a **Decks** tab with `Deck name` and `Tab` columns, one row per deck;
+- a **Decks** tab with `Game` (Not Snap or Rascally Raccoons), `Deck name` and `Tab` columns, one row
+  per deck. Without `Game`, the game is worked out from the deck tab's columns;
 - one tab per deck, in the game's card columns (`src/deckFormats.ts`):
   - **Not Snap**: Name, Per Player, Cost, Power, and optionally an Effect from a fixed list with its
     Amount, and Ability (text for people).

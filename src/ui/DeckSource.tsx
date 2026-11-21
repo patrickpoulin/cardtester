@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { parseGameYaml } from '../dsl/compile';
-import { formatOf } from '../deckFormats';
+import { builtinGame, formatOf } from '../deckFormats';
 import type { GameEntry } from '../games';
 
 /** The deck's own name, without the game's name or the "(sheet)" marker. */
@@ -47,7 +47,9 @@ export function DeckSource({ entry }: Props) {
   const total = cards.reduce((n, c) => n + (Number(c.copies) || 0), 0);
   const changed = Object.entries(entry.sheet?.settings ?? {});
 
-  const where = `Read from the "${entry.sheet?.tab ?? ''}" tab of your Google Sheet${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. Click Reload from sheet above after editing it.`;
+  const gameId = formatOf(entry.game.id)?.gameId;
+  const gameName = gameId ? builtinGame(gameId).game.name : entry.game.name;
+  const where = `Game: ${gameName} (named in your sheet). This deck was read from the "${entry.sheet?.tab ?? ''}" tab${entry.sheet?.fetchedAt ? ` at ${time(entry.sheet.fetchedAt)}` : ''}. Click Load sheet above after editing it.`;
 
   return (
     <div className="deck-source">
