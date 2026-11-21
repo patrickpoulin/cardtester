@@ -138,8 +138,8 @@ describe('Deck formats and pasted rows', () => {
 
   it("reads pasted rows without a header in the template's column order", () => {
     const notSnap = DECK_FORMATS[0];
-    expect(pastedCardRows('Imp\t2\t1\t1\tDraw\t1\t"Draws a card"\nOgre\t\t4\t7\n', notSnap.columns)).toEqual([
-      { name: 'Imp', perPlayer: 2, attrs: { cost: 1, power: 1, effect: 'Draw', amount: 1, ability: 'Draws a card' } },
+    expect(pastedCardRows('Imp\t2\t1\t1\t"Draws a card"\nOgre\t\t4\t7\n', notSnap.columns)).toEqual([
+      { name: 'Imp', perPlayer: 2, attrs: { cost: 1, power: 1, ability: 'Draws a card' } },
       { name: 'Ogre', attrs: { cost: 4, power: 7 } },
     ]);
     expect(pastedCardRows('Fair Trade\tSwap a card\t4\n', DECK_FORMATS[1].columns)).toEqual([

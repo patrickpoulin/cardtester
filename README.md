@@ -12,7 +12,9 @@ and tested here.
    battler, or Rascally Raccoons, a race to hold Percy the Dog when the last raccoon turns up) and
    click **Make a copy**. Share your copy as **Anyone with the link can view** and paste its link
    into the box (or open the site with `?sheet=<link>`). **Try it** loads an example as it is.
-2. The sheet says which game it is, so its rules, settings and decks all load together.
+2. Click **Analyze**. The sheet says which game it is, so its rules, settings and decks load
+   together, and Claude turns each card's text into rules (see below). The table shows how each
+   card text will play. Then click **Build test**.
 3. Choose a deck from the sheet and how well each player plays, then click **Run**. Your computer
    plays all the games, spread across its CPU cores.
 4. Read the report: win rate per seat with 95% confidence ranges, first-player advantage, comeback
@@ -20,7 +22,7 @@ and tested here.
    played. **Watch one game** steps through a single game move by move. Download it as a spreadsheet
    (summary or one row per game).
 
-Change the sheet, click **Load sheet** again, and run again. Every run is kept under **Saved runs**,
+Change the sheet, click **Analyze** again, and run again. Every run is kept under **Saved runs**,
 and **Compare** puts any two of them side by side and says which differences are real and which
 could just be luck.
 
@@ -36,18 +38,27 @@ last copy that loaded in this browser is used. It needs:
 - a **Decks** tab with `Game` (Not Snap or Rascally Raccoons), `Deck name` and `Tab` columns, one row
   per deck. Without `Game`, the game is worked out from the deck tab's columns;
 - one tab per deck, in the game's card columns (`src/deckFormats.ts`):
-  - **Not Snap**: Name, Per Player, Cost, Power, and optionally an Effect with its Amount, and Ability
-    (text for people). Effect is a dropdown of the sheet's **Effects** tab, named "When: What":
-    On Reveal (when played), Ongoing (while in play) and When Destroyed, for example
-    `On Reveal: Destroy the weakest enemy here` or `When Destroyed: Draw`.
+  - **Not Snap**: Name, Per Player, Cost, Power and Ability, the card's text in plain English
+    (On Reveal, Ongoing, When Destroyed and end-of-turn abilities can all be played).
   - **Rascally Raccoons**: Card Name, Text, Copies and Effect, the original card it plays like.
     Cards named like an original card don't need an Effect.
 - optionally a **Settings** tab with `Setting` and `Value` columns. Not Snap's settings are
   `openingHand`, `turns`, `handLimit`, `drawPerTurn`, `cardsPerLocation`, `forgeBonus` and
   `bogPenalty`; Rascally Raccoons has `endYourTurnSkipsDraw`.
 
-Other tabs are ignored. Card behaviour comes from each game's rules file (`src/games/*.yaml`): a deck
-picks one of the game's existing effects for each card. The loader is `src/sheet.ts`.
+Other tabs are ignored. The game's rules come from its rules file (`src/games/*.yaml`); the loader
+is `src/sheet.ts`.
+
+### Card text and the Claude API key
+
+Not Snap card text is turned into rules by Claude (`src/ai/`). Paste a Claude API key (from the
+[Claude Console](https://console.anthropic.com/settings/keys)) into the site; it stays in your
+browser and is sent only to the Claude API. Each text is translated once, test-played in a few dozen
+quick games, and remembered in the browser, so it plays the same way in every run until its wording
+changes, and analyzing again costs nothing unless card text changed. A translation that fails test
+play is sent back once to be fixed; if it still fails, the card plays without its ability and the
+table says why. The wording the example sheets use comes already translated, so the examples play
+without a key. Rascally Raccoons cards still name the original card they play like.
 
 ## Development
 

@@ -518,3 +518,8 @@ table.effects {
 .deck-source p {
   margin: 4px 0;
 }
+
+/* A card text that won't play fully. */
+tr.warn td:last-child {
+  color: var(--error);
+}

@@ -1,6 +1,6 @@
 import { isMap, parseDocument } from 'yaml';
 import { type CardRow, cardRows, CardListError, parseDelimited } from './cardList';
-import { DeckError } from './deck';
+import { type AbilityBook, DeckError } from './deck';
 import { DECK_FORMATS, builtinGame, type DeckFormat } from './deckFormats';
 import { GameDefinitionError } from './dsl/compile';
 import { smokeTest } from './dsl/smoke';
@@ -17,7 +17,8 @@ import type { GameEntry } from './games';
  *   values under vars.shared in its rules file); it replaces that value for every deck in the sheet.
  * - One tab per deck, in the same columns as the game's deck template.
  *
- * Other tabs (Effects, Rules) are for people and are not read.
+ * Other tabs (such as Rules) are for people and are not read. Card text in a Not Snap deck's Ability
+ * column is turned into rules by Claude before the decks are built (src/ai/translate.ts).
  */
 
 export const DECKS_TAB = 'Decks';
@@ -178,8 +179,23 @@ export interface SheetGames {
   notes: string[];
 }
 
+/** The deck tabs' card rows, by deck name; decks whose tab is missing or unreadable are left out. */
+export function sheetDeckRows(tabs: SheetTabs): { deck: string; rows: CardRow[] }[] {
+  const decksCsv = tabs[DECKS_TAB];
+  if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) return [];
+  return deckList(decksCsv).flatMap((d) => {
+    const csv = tabs[d.tab];
+    if (csv === undefined || isOtherTab(csv, d.tab)) return [];
+    try {
+      return [{ deck: d.name, rows: cardRows(parseDelimited(csv, ',')) }];
+    } catch {
+      return [];
+    }
+  });
+}
+
 /** Builds a game for each deck in the sheet, with the sheet's settings. A deck with problems is left out and its problems listed. */
-export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: number): SheetGames {
+export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: number, book?: AbilityBook): SheetGames {
   const decksCsv = tabs[DECKS_TAB];
   if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) throw new SheetError(`The sheet needs a tab named "${DECKS_TAB}" with Deck name and Tab columns`);
   const settings = applySettings(format.rules, tabs[SETTINGS_TAB], format.settings);
@@ -195,7 +211,7 @@ export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: numb
     }
     try {
       const rows: CardRow[] = cardRows(parseDelimited(csv, ','));
-      const entry = format.deckGame(rows, `${deck.name} (sheet)`, settings.rules);
+      const entry = format.deckGame(rows, `${deck.name} (sheet)`, settings.rules, book);
       const problems = smokeTest(entry.game);
       if (problems.length) {
         issues.push(...problems.map((p) => `${deck.name}: ${p}`));

@@ -48,7 +48,7 @@ export function App() {
           ) : (
             <section className="card">
               <h2>Set up the test</h2>
-              <p className="muted">Load a Google Sheet above to choose a deck and run games.</p>
+              <p className="muted">Analyze a Google Sheet above, then click Build test to choose a deck and run games.</p>
             </section>
           )}
         </div>

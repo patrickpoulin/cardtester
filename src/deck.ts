@@ -1,12 +1,14 @@
 import { isMap, isSeq, parseDocument } from 'yaml';
 import { type CardRow, mergeCardList } from './cardList';
+import { abilityAttrs, abilityKey, hasCode, rulesWithAbilities, type CardAbility } from './ai/abilities';
 import { loadGame } from './dsl/compile';
 import type { GameEntry } from './games';
 
 /*
- * A deck for Not Snap: one row per card with its cost, power and optionally one ability, played
- * with the fixed Not Snap rules. The abilities are carried out by the rules file, so a deck can
- * only use the effects listed here.
+ * A deck for Not Snap: one row per card with its cost, power and optionally its ability, played
+ * with the fixed Not Snap rules. An ability is card text (the Ability column) translated into rules
+ * by Claude (src/ai). An older deck may instead name one of the EFFECTS below with an Amount; those
+ * are carried out by the rules file and still work.
  */
 
 export interface DeckEffect {
@@ -88,14 +90,45 @@ export function normalizeDeck(rows: CardRow[]): CardRow[] {
   return cards;
 }
 
-/** The Not Snap rules with the starter deck replaced by this deck. */
-export function deckGame(rules: string, rows: CardRow[], deckName: string): GameEntry {
+/** Abilities translated from card text, by abilityKey of the text. */
+export type AbilityBook = Map<string, CardAbility>;
+
+/**
+ * Gives each card whose Ability text has a translation (and no Effect) the rules for it: the card's
+ * `ai` attribute names its ability, and the rules get the code. Cards that share a text share an id.
+ */
+export function withAbilities(rules: string, cards: CardRow[], book?: AbilityBook): { rules: string; cards: CardRow[] } {
+  const ids = new Map<string, string>();
+  const used = new Map<string, CardAbility>();
+  const marked = cards.map((c) => {
+    const text = c.attrs.ability;
+    if (!book || c.attrs.effect !== undefined || typeof text !== 'string' || !text.trim()) return { card: c, id: '' };
+    const ability = book.get(abilityKey(text));
+    if (!ability || !hasCode(ability)) return { card: c, id: '' };
+    let id = ids.get(ability.text);
+    if (!id) {
+      id = `a${ids.size + 1}`;
+      ids.set(ability.text, id);
+      used.set(id, ability);
+    }
+    return { card: c, id };
+  });
+  if (!used.size) return { rules, cards };
+  return {
+    rules: rulesWithAbilities(rules, used),
+    cards: marked.map(({ card, id }) => ({ ...card, attrs: { ...card.attrs, ...abilityAttrs(id) } })),
+  };
+}
+
+/** The Not Snap rules with the starter deck replaced by this deck, and the cards' translated abilities if a book is given. */
+export function deckGame(baseRules: string, rows: CardRow[], deckName: string, book?: AbilityBook): GameEntry {
+  const { rules, cards } = withAbilities(baseRules, normalizeDeck(rows), book);
   const doc = parseDocument(rules);
   doc.set('cards', doc.createNode([]));
   const slug = deckName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'deck';
   doc.set('id', `${DECK_ID_PREFIX}${slug}`);
   doc.set('name', `Not Snap: ${deckName.trim() || 'Deck'}`);
-  const source = mergeCardList(doc.toString({ lineWidth: 0 }), normalizeDeck(rows));
+  const source = mergeCardList(doc.toString({ lineWidth: 0 }), cards);
   return { game: loadGame(source), source, builtin: false };
 }
 

@@ -1,5 +1,5 @@
 import { type CardRow, cardRows, CardListError, parseDelimited } from './cardList';
-import { deckCsv, deckGame, EFFECTS, isDeckGame, type DeckEffect } from './deck';
+import { type AbilityBook, deckCsv, deckGame, EFFECTS, isDeckGame, type DeckEffect } from './deck';
 import { BUILTIN_GAMES, type GameEntry, NOT_SNAP_RULES, RASCALLY_RACCOONS_RULES } from './games';
 import { isRaccoonDeck, RACCOON_COLUMNS, raccoonDeckCsv, raccoonDeckGame, raccoonEffects } from './raccoonDeck';
 
@@ -23,7 +23,9 @@ export interface DeckFormat {
   /** A read-only Google Sheet with this game's original deck, for people to copy. */
   exampleSheet: string;
   /** Checks the rows and builds the game they make with the game's rules (or `rules`, such as the rules with a sheet's settings). Throws DeckError. */
-  deckGame(rows: CardRow[], deckName: string, rules?: string): GameEntry;
+  deckGame(rows: CardRow[], deckName: string, rules?: string, book?: AbilityBook): GameEntry;
+  /** Whether the game plays card text translated by Claude (the Ability column). */
+  translatesText: boolean;
   /** A game of this kind (the built-in one or a deck) as CSV in the template's columns. */
   deckCsv(source: string): string;
   isDeck(id: string): boolean;
@@ -32,13 +34,14 @@ export interface DeckFormat {
 export const DECK_FORMATS: DeckFormat[] = [
   {
     gameId: 'not-snap',
-    columns: ['Name', 'Per Player', 'Cost', 'Power', 'Effect', 'Amount', 'Ability'],
+    columns: ['Name', 'Per Player', 'Cost', 'Power', 'Ability'],
     template: 'deck-template.xlsx',
     effects: EFFECTS,
     rules: NOT_SNAP_RULES,
     settings: ['openingHand', 'turns', 'handLimit', 'drawPerTurn', 'cardsPerLocation', 'forgeBonus', 'bogPenalty'],
     exampleSheet: '18MKJkmbiJXNpaWK75qcFVc-S_7cUKb3oKUIr3plwUuQ',
-    deckGame: (rows, name, rules = NOT_SNAP_RULES) => deckGame(rules, rows, name),
+    deckGame: (rows, name, rules = NOT_SNAP_RULES, book) => deckGame(rules, rows, name, book),
+    translatesText: true,
     deckCsv,
     isDeck: isDeckGame,
   },
@@ -51,6 +54,7 @@ export const DECK_FORMATS: DeckFormat[] = [
     settings: ['endYourTurnSkipsDraw'],
     exampleSheet: '1ZEg5t5cTxueYxp50WYw0vDEU6uOupPD1n-r6cPwJ2NE',
     deckGame: (rows, name, rules = RASCALLY_RACCOONS_RULES) => raccoonDeckGame(rules, rows, name),
+    translatesText: false,
     deckCsv: (source) => raccoonDeckCsv(RASCALLY_RACCOONS_RULES, source),
     isDeck: isRaccoonDeck,
   },
