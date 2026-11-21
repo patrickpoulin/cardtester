@@ -6,7 +6,7 @@ import type { CardAbility } from './abilities';
  * from Claude for the same text is never needed.
  */
 
-const blank = { onReveal: '', ongoingMine: '', ongoingTheirs: '', whenDestroyed: '', endOfTurn: '', unsupported: '' };
+const blank = { onReveal: '', ongoingMine: '', ongoingTheirs: '', whenDestroyed: '', endOfTurn: '', gameStart: '', afterCardPlayed: '', whenCardDestroyed: '', unsupported: '' };
 const n = (k: number) => (k === 1 ? 'a card' : `${k} cards`);
 
 const draw = (k: number): CardAbility => ({

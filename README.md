@@ -42,6 +42,9 @@ last copy that loaded in this browser is used. It needs:
     (On Reveal, Ongoing, When Destroyed and end-of-turn abilities can all be played).
   - **Rascally Raccoons**: Card Name, Text, Copies and Effect, the original card it plays like.
     Cards named like an original card don't need an Effect.
+- for Not Snap, optionally a **Card Pool** tab in the deck columns plus `Copies` (2 by default):
+  the cards abilities can create or add, such as "add a random card to your hand" or "shuffle 4
+  Ancient Arcana into your deck";
 - optionally a **Settings** tab with `Setting` and `Value` columns. Not Snap's settings are
   `openingHand`, `turns`, `handLimit`, `drawPerTurn`, `cardsPerLocation`, `forgeBonus` and
   `bogPenalty`; Rascally Raccoons has `endYourTurnSkipsDraw`.
@@ -55,7 +58,11 @@ Not Snap card text is turned into rules by Claude (`src/ai/`). Paste a Claude AP
 [Claude Console](https://console.anthropic.com/settings/keys)) into the site; it stays in your
 browser and is sent only to the Claude API. Each text is translated once, test-played in a few dozen
 quick games, and remembered in the browser, so it plays the same way in every run until its wording
-changes, and analyzing again costs nothing unless card text changed. A translation that fails test
+changes, and analyzing again costs nothing unless card text changed. Abilities can trigger On
+Reveal, Ongoing, When Destroyed, at the end of your turn, at Game Start, after a card is played, and
+when any card is destroyed (even from the hand or deck); they can see the last card each player
+played, copy another card's On Reveal, remove a card's text, banish cards, and take cards from the
+Card Pool. A translation that fails test
 play is sent back once to be fixed; if it still fails, the card plays without its ability and the
 table says why. The wording the example sheets use comes already translated, so the examples play
 without a key. Rascally Raccoons cards still name the original card they play like.

@@ -23,7 +23,7 @@ export interface DeckFormat {
   /** A read-only Google Sheet with this game's original deck, for people to copy. */
   exampleSheet: string;
   /** Checks the rows and builds the game they make with the game's rules (or `rules`, such as the rules with a sheet's settings). Throws DeckError. */
-  deckGame(rows: CardRow[], deckName: string, rules?: string, book?: AbilityBook): GameEntry;
+  deckGame(rows: CardRow[], deckName: string, rules?: string, book?: AbilityBook, pool?: CardRow[]): GameEntry;
   /** Whether the game plays card text translated by Claude (the Ability column). */
   translatesText: boolean;
   /** A game of this kind (the built-in one or a deck) as CSV in the template's columns. */
@@ -40,7 +40,7 @@ export const DECK_FORMATS: DeckFormat[] = [
     rules: NOT_SNAP_RULES,
     settings: ['openingHand', 'turns', 'handLimit', 'drawPerTurn', 'cardsPerLocation', 'forgeBonus', 'bogPenalty'],
     exampleSheet: '18MKJkmbiJXNpaWK75qcFVc-S_7cUKb3oKUIr3plwUuQ',
-    deckGame: (rows, name, rules = NOT_SNAP_RULES, book) => deckGame(rules, rows, name, book),
+    deckGame: (rows, name, rules = NOT_SNAP_RULES, book, pool) => deckGame(rules, rows, name, book, pool),
     translatesText: true,
     deckCsv,
     isDeck: isDeckGame,

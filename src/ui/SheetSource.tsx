@@ -3,7 +3,7 @@ import { abilityKey, hasCode } from '../ai/abilities';
 import { abilityTexts, savedApiKey, saveApiKey, savedBook, translateTexts } from '../ai/translate';
 import { DECK_FORMATS, builtinGame } from '../deckFormats';
 import type { GameEntry } from '../games';
-import { fetchSheetTabs, savedSheet, saveSheet, sheetDeckRows, sheetFormat, sheetGames, sheetIdFromLink, type SheetTabs } from '../sheet';
+import { fetchSheetTabs, poolRows, savedSheet, saveSheet, sheetDeckRows, sheetFormat, sheetGames, sheetIdFromLink, type SheetTabs } from '../sheet';
 
 interface Props {
   /** Replaces the decks with the sheet's, built with the rules of the game the sheet names. `choose` is true when the person asked for the load. */
@@ -66,7 +66,7 @@ export function SheetSource({ onLoad }: Props) {
       const missing = all.filter((t) => !savedBook().has(abilityKey(t)));
       if (missing.length && translate && apiKey.trim()) {
         try {
-          const results = await translateTexts(missing, apiKey.trim(), setProgress);
+          const results = await translateTexts(missing, apiKey.trim(), { progress: setProgress, pool: poolRows(tabs) });
           for (const r of results) if (r.problems.length) failures.set(abilityKey(r.ability.text), r.problems[0]);
         } catch (err) {
           issues.push(err instanceof Error ? err.message : String(err));
@@ -235,6 +235,13 @@ export function SheetSource({ onLoad }: Props) {
             <li key={f.gameId}>
               {builtinGame(f.gameId).game.name}: one tab per deck with columns {f.columns.join(', ')}; an optional <strong>Settings</strong> tab
               (Setting, Value) can change {f.settings.join(', ')}.
+              {f.translatesText && (
+                <>
+                  {' '}
+                  An optional <strong>Card Pool</strong> tab, in the same columns plus Copies, lists cards that abilities can create or add
+                  (&ldquo;add a random card to your hand&rdquo;).
+                </>
+              )}
             </li>
           ))}
         </ul>

@@ -23,6 +23,8 @@ import type { GameEntry } from './games';
 
 export const DECKS_TAB = 'Decks';
 export const SETTINGS_TAB = 'Settings';
+/** Not Snap: cards abilities can create ("add a random card to your hand"). */
+export const POOL_TAB = 'Card Pool';
 
 /** The spreadsheet id in a Google Sheets link, or the id itself. */
 export function sheetIdFromLink(link: string): string | null {
@@ -104,7 +106,7 @@ export async function fetchSheetTabs(sheetId: string, fetcher: Fetcher = (url) =
   }
   const tabs: SheetTabs = { [DECKS_TAB]: await get(DECKS_TAB) };
   const decks = deckList(tabs[DECKS_TAB]);
-  const names = [SETTINGS_TAB, ...new Set(decks.map((d) => d.tab))].filter((t) => t !== DECKS_TAB);
+  const names = [SETTINGS_TAB, POOL_TAB, ...new Set(decks.map((d) => d.tab))].filter((t, i, all) => t !== DECKS_TAB && all.indexOf(t) === i);
   const texts = await Promise.all(names.map(get));
   names.forEach((name, i) => (tabs[name] = texts[i]));
   return tabs;
@@ -179,11 +181,25 @@ export interface SheetGames {
   notes: string[];
 }
 
-/** The deck tabs' card rows, by deck name; decks whose tab is missing or unreadable are left out. */
+/** The Card Pool tab's rows, or none when the sheet has no such tab. */
+export function poolRows(tabs: SheetTabs): CardRow[] {
+  const csv = tabs[POOL_TAB];
+  if (csv === undefined || isOtherTab(csv, POOL_TAB)) return [];
+  // Google sends the first tab for a missing one; that tab could be a deck.
+  if (Object.entries(tabs).some(([name, text]) => name !== POOL_TAB && text === csv)) return [];
+  try {
+    return cardRows(parseDelimited(csv, ','));
+  } catch {
+    return [];
+  }
+}
+
+/** The deck tabs' card rows, by deck name, then the Card Pool's; decks whose tab is missing or unreadable are left out. */
 export function sheetDeckRows(tabs: SheetTabs): { deck: string; rows: CardRow[] }[] {
   const decksCsv = tabs[DECKS_TAB];
   if (decksCsv === undefined || isOtherTab(decksCsv, DECKS_TAB)) return [];
-  return deckList(decksCsv).flatMap((d) => {
+  const pool = poolRows(tabs);
+  return [...deckList(decksCsv), ...(pool.length ? [{ name: POOL_TAB, tab: POOL_TAB }] : [])].flatMap((d) => {
     const csv = tabs[d.tab];
     if (csv === undefined || isOtherTab(csv, d.tab)) return [];
     try {
@@ -211,7 +227,7 @@ export function sheetGames(format: DeckFormat, tabs: SheetTabs, fetchedAt?: numb
     }
     try {
       const rows: CardRow[] = cardRows(parseDelimited(csv, ','));
-      const entry = format.deckGame(rows, `${deck.name} (sheet)`, settings.rules, book);
+      const entry = format.deckGame(rows, `${deck.name} (sheet)`, settings.rules, book, poolRows(tabs));
       const problems = smokeTest(entry.game);
       if (problems.length) {
         issues.push(...problems.map((p) => `${deck.name}: ${p}`));
