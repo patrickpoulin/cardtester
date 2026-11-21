@@ -16,12 +16,22 @@ export interface DeckEffect {
 }
 
 export const EFFECTS: DeckEffect[] = [
-  { id: 'draw', label: 'Draw', description: 'On Reveal: draw Amount cards (hand limit 7).' },
-  { id: 'boost-here', label: 'Boost Here', description: 'On Reveal: your other cards at this location get +Amount power.' },
-  { id: 'weaken-here', label: 'Weaken Here', description: "On Reveal: your opponent's cards at this location get -Amount power." },
-  { id: 'contested', label: 'Contested', description: 'On Reveal: if your opponent has a card at this location, this card gets +Amount power.' },
-  { id: 'alone', label: 'Alone', description: 'On Reveal: if this is your only card at this location, it gets +Amount power.' },
-  { id: 'ongoing-boost', label: 'Ongoing Boost', description: 'Ongoing: your other cards at this location have +Amount power.' },
+  { id: 'draw', label: 'On Reveal: Draw', description: 'On Reveal: draw Amount cards (up to the hand limit).' },
+  { id: 'boost-here', label: 'On Reveal: Boost my other cards here', description: 'On Reveal: your other cards at this location get +Amount power.' },
+  { id: 'weaken-here', label: 'On Reveal: Weaken enemy cards here', description: "On Reveal: your opponent's cards at this location get -Amount power." },
+  { id: 'contested', label: 'On Reveal: +Power if an enemy is here', description: 'On Reveal: if your opponent has a card at this location, this card gets +Amount power.' },
+  { id: 'alone', label: 'On Reveal: +Power if alone here', description: 'On Reveal: if this is your only card at this location, it gets +Amount power.' },
+  { id: 'destroy-enemy', label: 'On Reveal: Destroy the weakest enemy here', description: "On Reveal: destroy your opponent's lowest-power card at this location (Amount isn't used)." },
+  {
+    id: 'destroy-own',
+    label: 'On Reveal: Destroy my weakest other card here, +Power',
+    description: 'On Reveal: if you have another card at this location, destroy your lowest-power one and this card gets +Amount power.',
+  },
+  { id: 'ongoing-boost', label: 'Ongoing: Boost my other cards here', description: 'Ongoing: your other cards at this location have +Amount power.' },
+  { id: 'ongoing-weaken', label: 'Ongoing: Weaken enemy cards here', description: "Ongoing: your opponent's cards at this location have -Amount power." },
+  { id: 'ongoing-full', label: 'Ongoing: +Power if my side here is full', description: 'Ongoing: if your side of this location is full, this card has +Amount power.' },
+  { id: 'destroyed-draw', label: 'When Destroyed: Draw', description: 'When this card is destroyed, its owner draws Amount cards (up to the hand limit).' },
+  { id: 'destroyed-boost', label: 'When Destroyed: Boost my other cards here', description: "When this card is destroyed, its owner's other cards at that location get +Amount power." },
 ];
 
 const DECK_ID_PREFIX = 'not-snap-';
@@ -67,6 +77,7 @@ export function normalizeDeck(rows: CardRow[]): CardRow[] {
       const id = effectId(String(attrs.effect));
       if (!id) problem(`unknown Effect "${attrs.effect}"; use one of ${EFFECTS.map((e) => e.label).join(', ')}, or leave it empty`);
       else attrs.effect = id;
+      if (id === 'destroy-enemy') attrs.amount ??= 0; // destroying needs no number
       if (typeof attrs.amount !== 'number' || !Number.isInteger(attrs.amount)) problem('an Effect needs a whole-number Amount');
     } else if (attrs.amount !== undefined) problem('Amount is set but Effect is empty');
     // Not Snap has no shared piles, so Count means copies in each player's deck too.

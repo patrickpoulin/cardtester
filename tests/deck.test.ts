@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { cardRows, parseDelimited, readCardList } from '../src/cardList';
 import { parseGameYaml } from '../src/dsl/compile';
 import { smokeTest } from '../src/dsl/smoke';
-import { DeckError, deckCsv, deckGame, isDeckGame } from '../src/deck';
+import { getAgent } from '../src/engine/agents';
+import { Rng } from '../src/engine/rng';
+import { DeckError, EFFECTS, deckCsv, deckGame, isDeckGame } from '../src/deck';
 import { BUILTIN_GAMES, NOT_SNAP_RULES } from '../src/games';
 
 const starterCsv = deckCsv(NOT_SNAP_RULES);
@@ -62,9 +64,43 @@ describe('Not Snap decks', () => {
       expect(err).toBeInstanceOf(DeckError);
       expect((err as DeckError).issues).toEqual([
         'A: Power must be a whole number',
-        'B: unknown Effect "Explode"; use one of Draw, Boost Here, Weaken Here, Contested, Alone, Ongoing Boost, or leave it empty',
+        `B: unknown Effect "Explode"; use one of ${EFFECTS.map((e) => e.label).join(', ')}, or leave it empty`,
         'C: an Effect needs a whole-number Amount',
       ]);
     }
+  });
+});
+
+describe('Not Snap On Reveal, Ongoing and When Destroyed effects', () => {
+  const deck = [
+    'Name,Per Player,Cost,Power,Effect,Amount',
+    'Hunter,2,1,2,On Reveal: Destroy the weakest enemy here,',
+    'Glutton,2,2,2,"On Reveal: Destroy my weakest other card here, +Power",3',
+    'Martyr,2,1,1,When Destroyed: Draw,2',
+    'Rally,2,1,1,When Destroyed: Boost my other cards here,2',
+    'Hex,1,3,2,Ongoing: Weaken enemy cards here,1',
+    'Tiny,2,1,1,Ongoing: +Power if my side here is full,4',
+    'Scout,2,1,2,Draw,1',
+  ].join('\n');
+
+  it('reads the new effect names and plays them', () => {
+    const entry = deckGame(NOT_SNAP_RULES, rows(deck), 'Effects');
+    const effects = parseGameYaml(entry.source).cards.map((c) => ('attrs' in c ? c.attrs?.effect : undefined));
+    expect(effects).toEqual(['destroy-enemy', 'destroy-own', 'destroyed-draw', 'destroyed-boost', 'ongoing-weaken', 'ongoing-full', 'draw']);
+    expect(smokeTest(entry.game, 20)).toEqual([]);
+  });
+
+  it('destroys cards into the destroyed pile and runs When Destroyed', () => {
+    const entry = deckGame(NOT_SNAP_RULES, rows(deck), 'Effects');
+    const game = entry.game;
+    const agent = getAgent('greedy');
+    let destroyed = 0;
+    for (let i = 0; i < 20; i++) {
+      const rng = new Rng(i + 1);
+      const state = game.setup(2, rng) as { players: { destroyed: unknown[] }[] };
+      while (!game.isTerminal(state)) game.applyAction(state, agent.choose(game, state, game.legalActions(state), rng), rng);
+      destroyed += state.players.reduce((n, p) => n + p.destroyed.length, 0);
+    }
+    expect(destroyed).toBeGreaterThan(0);
   });
 });
