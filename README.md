@@ -36,8 +36,10 @@ last copy that loaded in this browser is used. It needs:
 - a **Decks** tab with `Game` (Not Snap or Rascally Raccoons), `Deck name` and `Tab` columns, one row
   per deck. Without `Game`, the game is worked out from the deck tab's columns;
 - one tab per deck, in the game's card columns (`src/deckFormats.ts`):
-  - **Not Snap**: Name, Per Player, Cost, Power, and optionally an Effect from a fixed list with its
-    Amount, and Ability (text for people).
+  - **Not Snap**: Name, Per Player, Cost, Power, and optionally an Effect with its Amount, and Ability
+    (text for people). Effect is a dropdown of the sheet's **Effects** tab, named "When: What":
+    On Reveal (when played), Ongoing (while in play) and When Destroyed, for example
+    `On Reveal: Destroy the weakest enemy here` or `When Destroyed: Draw`.
   - **Rascally Raccoons**: Card Name, Text, Copies and Effect, the original card it plays like.
     Cards named like an original card don't need an Effect.
 - optionally a **Settings** tab with `Setting` and `Value` columns. Not Snap's settings are

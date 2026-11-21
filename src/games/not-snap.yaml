@@ -30,8 +30,10 @@ timing:
 
 # -----------------------------------------------------------------------------
 # CARDS: the starter deck. Each player gets one copy of each card.
-# effect is one of: draw, boost-here, weaken-here, contested, alone,
-# ongoing-boost (see the play action and lanePower), and amount is its number.
+# effect is one of the EFFECTS in src/deck.ts: On Reveal (draw, boost-here,
+# weaken-here, contested, alone, destroy-enemy, destroy-own), Ongoing
+# (ongoing-boost, ongoing-weaken, ongoing-full; see lanePower) or When
+# Destroyed (destroyed-draw, destroyed-boost), and amount is its number.
 # -----------------------------------------------------------------------------
 cards:
   - name: Scout
@@ -81,6 +83,7 @@ zones:
     lane1: { visibility: public }
     lane2: { visibility: public }
     lane3: { visibility: public }
+    destroyed: { visibility: public } # cards destroyed by an ability
 
 vars:
   shared:
@@ -108,6 +111,8 @@ define:
     (p, l) => sum(laneOf(p, l), c => c.power)
       + sum(laneOf(p, l), c => c.effect == 'ongoing-boost' ? c.amount * (len(laneOf(p, l)) - 1) : 0)
       - (l == 3 ? bogPenalty * len(laneOf(p, l)) : 0)
+      - len(laneOf(p, l)) * sum(laneOf(opponent(p), l), c => c.effect == 'ongoing-weaken' ? c.amount : 0)
+      + (len(laneOf(p, l)) >= cardsPerLocation ? sum(laneOf(p, l), c => c.effect == 'ongoing-full' ? c.amount : 0) : 0)
   locationsWon: "p => count([1, 2, 3], l => lanePower(p, l) > lanePower(opponent(p), l))"
   totalPower: "p => lanePower(p, 1) + lanePower(p, 2) + lanePower(p, 3)"
   openLanes: "filter([1, 2, 3], l => len(laneOf(me, l)) < cardsPerLocation)"
@@ -171,6 +176,44 @@ actions:
       - if: "card.effect == 'alone' and len(laneOf(me, lane)) == 1"
         then:
           - add: { var: card.power, value: card.amount }
+      # Destroy: the card leaves play for its owner's destroyed pile.
+      - if: "card.effect == 'destroy-enemy' and len(laneOf(opponent(me), lane)) > 0"
+        then:
+          - forEach:
+              in: "[minBy(laneOf(opponent(me), lane), c => c.power)]"
+              as: victim
+              do:
+                - move: { card: victim, to: "opponent(me).destroyed" }
+                # When Destroyed abilities
+                - if: "victim.effect == 'destroyed-draw'"
+                  then:
+                    - draw: { from: opponent(me).deck, to: opponent(me).hand, count: "max(0, min(victim.amount, handLimit - len(opponent(me).hand)))" }
+                - if: "victim.effect == 'destroyed-boost'"
+                  then:
+                    - forEach:
+                        in: "laneOf(opponent(me), lane)"
+                        as: c
+                        do:
+                          - add: { var: c.power, value: victim.amount }
+      - if: "card.effect == 'destroy-own' and len(laneOf(me, lane)) > 1"
+        then:
+          - add: { var: card.power, value: card.amount }
+          - forEach:
+              in: "[minBy(filter(laneOf(me, lane), c => c.id != card.id), c => c.power)]"
+              as: victim
+              do:
+                - move: { card: victim, to: "me.destroyed" }
+                # When Destroyed abilities
+                - if: "victim.effect == 'destroyed-draw'"
+                  then:
+                    - draw: { from: me.deck, to: me.hand, count: "max(0, min(victim.amount, handLimit - len(me.hand)))" }
+                - if: "victim.effect == 'destroyed-boost'"
+                  then:
+                    - forEach:
+                        in: "laneOf(me, lane)"
+                        as: c
+                        do:
+                          - add: { var: c.power, value: victim.amount }
     # Prefer strong cards, contested locations, and avoid the Bog.
     score: >-
       10 * (card.power + (card.amount ?? 0) + (lane == 2 ? 1 : 0) - (lane == 3 ? 1 : 0))
